@@ -43,6 +43,13 @@
       "when": 1785449079526,
       "tag": "0005_seed-currencies",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785451644563,
+      "tag": "0006_brief_celestials",
+      "breakpoints": true
     }
   ]
 }

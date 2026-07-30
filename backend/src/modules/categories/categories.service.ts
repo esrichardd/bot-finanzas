@@ -34,6 +34,24 @@ export async function listCategories(db: Database, userId: string) {
   return rows.map(toResponse);
 }
 
+/** Categoría visible (propia o del sistema), activa. Lanza NotFoundError / ValidationError. */
+export async function getAccessibleCategory(
+  db: Database,
+  userId: string,
+  categoryId: string,
+) {
+  const category = orThrow(
+    await db.query.categories.findFirst({
+      where: and(eq(categories.id, categoryId), accessibleTo(userId)),
+    }),
+    "category",
+  );
+  if (category.archived) {
+    throw new ValidationError("Category is archived");
+  }
+  return category;
+}
+
 export async function createCategory(
   db: Database,
   userId: string,

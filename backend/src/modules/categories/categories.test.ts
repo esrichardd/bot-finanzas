@@ -1,4 +1,5 @@
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
@@ -7,6 +8,9 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildServer } from "../../http/server.js";
 import { createDb } from "../../infra/db/client.js";
+import { user } from "../../infra/auth/auth.schema.js";
+import { getAccessibleCategory } from "./categories.service.js";
+import { NotFoundError, ValidationError } from "../../shared/errors.js";
 
 const SYSTEM_CATEGORY_ID = "00000000-0000-4000-8000-000000000001";
 
@@ -17,7 +21,10 @@ describe("categories module", () => {
   let userACookie: string;
   let userBCookie: string;
   let userACategoryId: string;
+  let userAActiveCategoryId: string;
   let userASubcategoryId: string;
+  let userAId: string;
+  let userBId: string;
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer("postgres:17")
@@ -45,6 +52,12 @@ describe("categories module", () => {
 
     userACookie = await signUp("user-a@example.com", "User A");
     userBCookie = await signUp("user-b@example.com", "User B");
+    userAId = (await database.db.query.user.findFirst({
+      where: eq(user.email, "user-a@example.com"),
+    }))!.id;
+    userBId = (await database.db.query.user.findFirst({
+      where: eq(user.email, "user-b@example.com"),
+    }))!.id;
   }, 60_000);
 
   afterAll(async () => {
@@ -183,6 +196,15 @@ describe("categories module", () => {
       afterArchive.json().some((category: { id: string }) => category.id === userASubcategoryId),
     ).toBe(false);
 
+    const activeCategory = await app.inject({
+      method: "POST",
+      url: "/categories",
+      headers: { cookie: userACookie },
+      payload: { name: "Categoría activa para movimientos" },
+    });
+    expect(activeCategory.statusCode).toBe(201);
+    userAActiveCategoryId = activeCategory.json().id;
+
     const archivedParentChild = await app.inject({
       method: "POST",
       url: "/categories",
@@ -190,6 +212,21 @@ describe("categories module", () => {
       payload: { name: "No permitido", parentId: userACategoryId },
     });
     expect(archivedParentChild.statusCode).toBe(400);
+  });
+
+  it("exposes accessible active category lookup for other modules", async () => {
+    const own = await getAccessibleCategory(database.db, userAId, userAActiveCategoryId);
+    expect(own.name).toBe("Categoría activa para movimientos");
+
+    const system = await getAccessibleCategory(database.db, userAId, SYSTEM_CATEGORY_ID);
+    expect(system.userId).toBeNull();
+
+    await expect(
+      getAccessibleCategory(database.db, userBId, userAActiveCategoryId),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      getAccessibleCategory(database.db, userAId, userACategoryId),
+    ).rejects.toBeInstanceOf(ValidationError);
   });
 
   async function signUp(email: string, name: string): Promise<string> {

@@ -13,6 +13,7 @@ import { healthRoutes } from "../modules/health/health.routes.js";
 import { usersRoutes } from "../modules/users/users.routes.js";
 import { categoriesRoutes } from "../modules/categories/categories.routes.js";
 import { accountsRoutes } from "../modules/accounts/accounts.routes.js";
+import { movementsRoutes } from "../modules/movements/movements.routes.js";
 
 export interface ServerDependencies {
   env: Env;
@@ -41,6 +42,7 @@ export function buildServer({
   app.register(usersRoutes, { requireAuth });
   app.register(categoriesRoutes, { db, requireAuth });
   app.register(accountsRoutes, { db, requireAuth });
+  app.register(movementsRoutes, { db, requireAuth });
 
   if (closeDb) {
     app.addHook("onClose", closeDb);

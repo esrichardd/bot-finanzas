@@ -1,4 +1,5 @@
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
@@ -7,6 +8,9 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildServer } from "../../http/server.js";
 import { createDb } from "../../infra/db/client.js";
+import { user } from "../../infra/auth/auth.schema.js";
+import { getOwnedActiveAccount } from "./accounts.service.js";
+import { NotFoundError, ValidationError } from "../../shared/errors.js";
 
 describe("accounts module", () => {
   let container: StartedPostgreSqlContainer;
@@ -15,6 +19,9 @@ describe("accounts module", () => {
   let userACookie: string;
   let userBCookie: string;
   let userAAccountId: string;
+  let userAActiveAccountId: string;
+  let userAId: string;
+  let userBId: string;
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer("postgres:17")
@@ -42,6 +49,12 @@ describe("accounts module", () => {
 
     userACookie = await signUp("accounts-user-a@example.com", "User A");
     userBCookie = await signUp("accounts-user-b@example.com", "User B");
+    userAId = (await database.db.query.user.findFirst({
+      where: eq(user.email, "accounts-user-a@example.com"),
+    }))!.id;
+    userBId = (await database.db.query.user.findFirst({
+      where: eq(user.email, "accounts-user-b@example.com"),
+    }))!.id;
   }, 60_000);
 
   afterAll(async () => {
@@ -250,6 +263,30 @@ describe("accounts module", () => {
       },
     });
     expect(recreate.statusCode).toBe(201);
+    userAActiveAccountId = recreate.json().id;
+  });
+
+  it("exposes an owned active account lookup for other modules", async () => {
+    const active = await getOwnedActiveAccount(
+      database.db,
+      userAId,
+      userAActiveAccountId,
+    );
+    expect(active.currencyCode).toBe("COP");
+
+    await expect(
+      getOwnedActiveAccount(database.db, userBId, userAActiveAccountId),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      getOwnedActiveAccount(
+        database.db,
+        userAId,
+        "00000000-0000-4000-8000-000000000099",
+      ),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      getOwnedActiveAccount(database.db, userAId, userAAccountId),
+    ).rejects.toBeInstanceOf(ValidationError);
   });
 
   async function signUp(email: string, name: string): Promise<string> {
