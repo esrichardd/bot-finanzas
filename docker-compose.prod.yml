@@ -1,0 +1,54 @@
+# Prod. Variables desde el .env de la raíz.
+# ${VAR:?} = falla al levantar si la variable no existe (sin defaults en prod).
+#
+# Topología de redes:
+#   internal (internal: true) → sin acceso a/desde fuera del host. Solo Postgres y quien deba hablarle.
+#   web                       → salida a internet (APIs de AI, etc.) y entrada vía Caddy cuando exista.
+# Postgres: SOLO internal, cero puertos publicados. Backend: ambas.
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER requerida}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requerida}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB requerida}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    restart: unless-stopped
+    networks:
+      - internal # hablar con postgres
+      - web # salir a internet; Caddy le llegará por aquí (sin puertos al host)
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  internal:
+    internal: true
+  web:
+
+volumes:
+  postgres_data:
