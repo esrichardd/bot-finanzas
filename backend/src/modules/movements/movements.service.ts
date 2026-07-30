@@ -151,6 +151,19 @@ export async function getBalances(db: Database, userId: string) {
   }));
 }
 
+/** Balance de una cuenta del usuario (0 si no tiene movimientos). */
+export async function getAccountBalance(
+  db: Database,
+  userId: string,
+  accountId: string,
+): Promise<number> {
+  const rows = await db
+    .select({ type: movements.type, amount: movements.amount })
+    .from(movements)
+    .where(ownedBy(movements.userId, userId, eq(movements.accountId, accountId)));
+  return computeBalance(rows);
+}
+
 export async function createTransfer(
   db: Database,
   userId: string,

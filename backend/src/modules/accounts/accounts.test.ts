@@ -22,6 +22,7 @@ describe("accounts module", () => {
   let userAActiveAccountId: string;
   let userAId: string;
   let userBId: string;
+  let binanceUsdId: string;
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer("postgres:17")
@@ -84,16 +85,40 @@ describe("accounts module", () => {
     expect(currencies.statusCode).toBe(200);
     expect(currencies.json()).toEqual([
       {
+        code: "BTC",
+        name: "Bitcoin",
+        decimals: 8,
+        kind: "crypto",
+      },
+      {
         code: "COP",
         name: "Peso colombiano",
         decimals: 2,
         kind: "fiat",
       },
       {
+        code: "ETH",
+        name: "Ethereum",
+        decimals: 8,
+        kind: "crypto",
+      },
+      {
+        code: "SOL",
+        name: "Solana",
+        decimals: 9,
+        kind: "crypto",
+      },
+      {
         code: "USD",
         name: "Dólar estadounidense",
         decimals: 2,
         kind: "fiat",
+      },
+      {
+        code: "USDT",
+        name: "Tether",
+        decimals: 6,
+        kind: "crypto",
       },
     ]);
 
@@ -161,7 +186,45 @@ describe("accounts module", () => {
         currencyCode: "USD",
         institution: "Binance",
       });
+      if (name === "Binance USD") binanceUsdId = cryptoAccount.json().id;
     }
+
+    const btcAccount = await app.inject({
+      method: "POST",
+      url: "/accounts",
+      headers: { cookie: userACookie },
+      payload: {
+        name: "Binance BTC real",
+        type: "crypto",
+        currencyCode: "BTC",
+        institution: "Binance",
+      },
+    });
+    expect(btcAccount.statusCode).toBe(201);
+
+    const purchase = await app.inject({
+      method: "POST",
+      url: "/transfers",
+      headers: { cookie: userACookie },
+      payload: {
+        fromAccountId: binanceUsdId,
+        toAccountId: btcAccount.json().id,
+        amountFrom: 50_000,
+        amountTo: 100_000_000,
+        occurredAt: "2026-07-30",
+      },
+    });
+    expect(purchase.statusCode).toBe(201);
+    const balances = await app.inject({
+      method: "GET",
+      url: "/balances",
+      headers: { cookie: userACookie },
+    });
+    expect(balances.statusCode).toBe(200);
+    expect(balances.json()).toContainEqual({
+      accountId: btcAccount.json().id,
+      balance: 100_000_000,
+    });
 
     const userBList = await app.inject({
       method: "GET",

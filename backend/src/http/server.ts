@@ -14,6 +14,7 @@ import { usersRoutes } from "../modules/users/users.routes.js";
 import { categoriesRoutes } from "../modules/categories/categories.routes.js";
 import { accountsRoutes } from "../modules/accounts/accounts.routes.js";
 import { movementsRoutes } from "../modules/movements/movements.routes.js";
+import { creditCardsRoutes } from "../modules/credit-cards/credit-cards.routes.js";
 
 export interface ServerDependencies {
   env: Env;
@@ -43,6 +44,7 @@ export function buildServer({
   app.register(categoriesRoutes, { db, requireAuth });
   app.register(accountsRoutes, { db, requireAuth });
   app.register(movementsRoutes, { db, requireAuth });
+  app.register(creditCardsRoutes, { db, requireAuth });
 
   if (closeDb) {
     app.addHook("onClose", closeDb);

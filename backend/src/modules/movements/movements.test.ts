@@ -7,6 +7,9 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildServer } from "../../http/server.js";
 import { createDb } from "../../infra/db/client.js";
+import { eq } from "drizzle-orm";
+import { user } from "../../infra/auth/auth.schema.js";
+import { getAccountBalance } from "./movements.service.js";
 
 const SYSTEM_CATEGORY_ID = "00000000-0000-4000-8000-000000000001";
 
@@ -16,6 +19,8 @@ describe("movements module", () => {
   let app: ReturnType<typeof buildServer>;
   let userACookie: string;
   let userBCookie: string;
+  let userAId: string;
+  let userBId: string;
   let copAccountId: string;
   let copDestinationId: string;
   let usdAccountId: string;
@@ -50,6 +55,12 @@ describe("movements module", () => {
 
     userACookie = await signUp("movements-user-a@example.com", "User A");
     userBCookie = await signUp("movements-user-b@example.com", "User B");
+    userAId = (await database.db.query.user.findFirst({
+      where: eq(user.email, "movements-user-a@example.com"),
+    }))!.id;
+    userBId = (await database.db.query.user.findFirst({
+      where: eq(user.email, "movements-user-b@example.com"),
+    }))!.id;
 
     copAccountId = await createAccount("Cuenta COP", "COP", userACookie);
     copDestinationId = await createAccount("Cuenta COP destino", "COP", userACookie);
@@ -377,6 +388,12 @@ describe("movements module", () => {
     expect(deleteFxTransfer.statusCode).toBe(204);
     expect(await balanceFor(copAccountId)).toBe(1_130_000);
     expect(await balanceFor(usdAccountId)).toBeUndefined();
+  });
+
+  it("exposes a scoped balance for one account", async () => {
+    expect(await getAccountBalance(database.db, userAId, copAccountId)).toBe(1_130_000);
+    expect(await getAccountBalance(database.db, userAId, copDestinationId)).toBe(0);
+    expect(await getAccountBalance(database.db, userBId, copAccountId)).toBe(0);
   });
 
   async function signUp(email: string, name: string): Promise<string> {
