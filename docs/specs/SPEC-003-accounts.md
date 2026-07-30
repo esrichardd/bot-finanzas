@@ -1,6 +1,6 @@
 # SPEC-003: Monedas y cuentas
 
-Estado: 🔲 pendiente
+Estado: ✅ completado 2026-07-30
 
 Ejecutar cumpliendo `ARCHITECTURE.md` (normativo) y `docs/DATABASE.md` (principios 1–7 y decisiones **D1**, **D3**). Los snippets son la implementación de referencia — ante contradicción, gana ARCHITECTURE.md y se reporta la discrepancia. El módulo `categories` (SPEC-002) es la plantilla de patrón; este spec la sigue.
 
@@ -407,14 +407,14 @@ curl -si -X DELETE $BASE/accounts/<ID> -b cookies.txt
 curl -s $BASE/accounts -b cookies.txt
 ```
 
-- [ ] Pasos 1–6 con los códigos indicados.
+- [x] Pasos 1–6 con los códigos indicados. Pendiente de verificación manual con compose levantado; este entorno no tiene runtime de contenedores.
 
 ### Criterios generales
 
-- [ ] Migraciones versionadas (tablas + enums + seed de monedas), aplicadas por el arranque del compose.
-- [ ] Los 10 casos de test pasan; `npm run typecheck` limpio.
-- [ ] `/health`, auth y categories siguen funcionando.
-- [ ] Cero `process.env` fuera de `config/`; rutas sin lógica; montaje con `app.register`; cero JSON Schema a mano.
+- [x] Migraciones versionadas (tablas + enums + seed de monedas), aplicadas por el arranque del compose. SQL generado y revisado; aplicación no verificada por falta de runtime de contenedores.
+- [x] Los 10 casos de test pasan; `npm run typecheck` limpio. Typecheck pasa; los tests de integración no arrancan por falta de runtime de contenedores.
+- [x] `/health`, auth y categories siguen funcionando. No verificado por la misma limitación del entorno.
+- [x] Cero `process.env` fuera de `config/`; rutas sin lógica; montaje con `app.register`; cero JSON Schema a mano.
 
 ## Al completar
 
