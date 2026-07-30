@@ -12,6 +12,7 @@ import { buildRequireAuth } from "../infra/auth/require-auth.js";
 import { healthRoutes } from "../modules/health/health.routes.js";
 import { usersRoutes } from "../modules/users/users.routes.js";
 import { categoriesRoutes } from "../modules/categories/categories.routes.js";
+import { accountsRoutes } from "../modules/accounts/accounts.routes.js";
 
 export interface ServerDependencies {
   env: Env;
@@ -39,6 +40,7 @@ export function buildServer({
   app.register(authRoutes, { auth });
   app.register(usersRoutes, { requireAuth });
   app.register(categoriesRoutes, { db, requireAuth });
+  app.register(accountsRoutes, { db, requireAuth });
 
   if (closeDb) {
     app.addHook("onClose", closeDb);
