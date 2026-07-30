@@ -1,6 +1,6 @@
 # SPEC-001: Autenticación con Better Auth
 
-Estado: 🔲 pendiente
+Estado: ✅ completado — 2026-07-30
 
 Ejecutar cumpliendo `ARCHITECTURE.md` (normativo). Este spec incluye snippets: son la implementación de referencia — seguirlos literalmente salvo que contradigan ARCHITECTURE.md, en cuyo caso ARCHITECTURE.md gana y se debe reportar la discrepancia.
 
@@ -433,21 +433,21 @@ rm -f cookies.txt
 
 Checklist del flujo:
 
-- [ ] Paso 1: 200 + `Set-Cookie`.
-- [ ] Paso 3: 200 + `Set-Cookie` (sign-in funciona tras logout).
-- [ ] Paso 4: 200 con la sesión y el usuario correctos.
-- [ ] Paso 5: 200 con `{ id, email, name }` correctos.
-- [ ] Paso 6: logout responde éxito.
-- [ ] Paso 7: **401** — la cookie invalidada NO da acceso a `/me`.
-- [ ] Paso 8: la sesión NO se devuelve tras el logout.
+- [x] Paso 1: 200 + `Set-Cookie`.
+- [x] Paso 3: 200 + `Set-Cookie` (sign-in funciona tras logout).
+- [x] Paso 4: 200 con la sesión y el usuario correctos.
+- [x] Paso 5: 200 con `{ id, email, name }` correctos.
+- [x] Paso 6: logout responde éxito.
+- [x] Paso 7: **401** — la cookie invalidada NO da acceso a `/me`.
+- [x] Paso 8: la sesión NO se devuelve tras el logout.
 
 ### Criterios generales
 
-- [ ] Arrancar sin `BETTER_AUTH_SECRET` → falla al inicio con mensaje claro.
-- [ ] Las tablas de auth existen vía migración Drizzle versionada (no `push`, no SQL manual).
-- [ ] `npm test` pasa (auth integration + db-helpers unit) y `npm run typecheck` limpio.
-- [ ] `/health` sigue respondiendo 200 (no se rompió nada del SPEC-000).
-- [ ] Cero `process.env` fuera de `config/env.ts`; cero JSON Schema a mano; rutas montadas con `app.register`.
+- [x] Arrancar sin `BETTER_AUTH_SECRET` → falla al inicio con mensaje claro.
+- [x] Las tablas de auth existen vía migración Drizzle versionada (no `push`, no SQL manual).
+- [x] `npm test` pasa (auth integration + db-helpers unit) y `npm run typecheck` limpio.
+- [x] `/health` sigue respondiendo 200 (no se rompió nada del SPEC-000).
+- [x] Cero `process.env` fuera de `config/env.ts`; cero JSON Schema a mano; rutas montadas con `app.register`.
 
 ## Al completar
 
