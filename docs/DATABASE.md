@@ -101,7 +101,7 @@ erDiagram
     uuid id PK
     string user_id FK
     uuid account_id FK
-    string type "income | expense | transfer_in | transfer_out | adjustment"
+    string type "income | expense | transfer_in | transfer_out | adjustment_in | adjustment_out"
     bigint amount "unidades minimas, positivo"
     uuid category_id FK "nullable"
     uuid transfer_id FK "nullable"
@@ -115,7 +115,7 @@ erDiagram
   }
 ```
 
-Notas del diagrama: `USER` es la tabla de Better Auth (referenciada, no modificada — principio 7). `movements.type = adjustment` existe para el balance inicial de una cuenta y correcciones manuales. Los campos mostrados son los estructurales; el código puede tener campos adicionales (descripción, timestamps, etc.).
+Notas del diagrama: `USER` es la tabla de Better Auth (referenciada, no modificada — principio 7). `adjustment_in`/`adjustment_out` existen para el balance inicial de una cuenta (que puede ser deuda: tarjeta) y correcciones manuales — dos tipos porque el principio 3 exige montos positivos con el signo en el type. Los campos mostrados son los estructurales; el código puede tener campos adicionales (descripción, timestamps, etc.).
 
 ## Orden de construcción
 
@@ -124,7 +124,7 @@ Notas del diagrama: `USER` es la tabla de Better Auth (referenciada, no modifica
 | SPEC-001 ✅ | `user`, `session`, `account`, `verification` (Better Auth) | Identidad                                            |
 | SPEC-002 ✅ | `categories`                                               | Estrena el patrón de módulo de dominio               |
 | SPEC-003 ✅ | `currencies` (seed USD, COP) + `accounts`                  | Sin satélite de tarjeta todavía                      |
-| SPEC-004    | `movements` + `transfers`                                  | El corazón: ledger, FX, comisiones, funciones puras  |
+| SPEC-004 ✅ | `movements` + `transfers`                                  | El corazón: ledger, FX, comisiones, funciones puras  |
 | Futuro      | `credit_card_details`                                      | Satélite 1:1 + lógica de corte/pago                  |
 | Futuro      | monedas crypto (seed) + `asset_prices`                     | Valoración de portafolio; precios vía adapter de API |
 
