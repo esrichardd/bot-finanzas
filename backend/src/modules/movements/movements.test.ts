@@ -70,7 +70,7 @@ describe("movements module", () => {
 
     const archive = await app.inject({
       method: "DELETE",
-      url: `/accounts/${archivedAccountId}`,
+      url: `/api/accounts/${archivedAccountId}`,
       headers: { cookie: userACookie },
     });
     expect(archive.statusCode).toBe(204);
@@ -87,10 +87,10 @@ describe("movements module", () => {
 
   it("handles the ledger, transfers, balances, filters, and scoping", async () => {
     for (const request of [
-      { method: "GET" as const, url: "/movements" },
+      { method: "GET" as const, url: "/api/movements" },
       {
         method: "POST" as const,
-        url: "/movements",
+        url: "/api/movements",
         payload: {
           accountId: copAccountId,
           type: "expense",
@@ -98,10 +98,10 @@ describe("movements module", () => {
           occurredAt: "2026-07-30",
         },
       },
-      { method: "GET" as const, url: "/balances" },
+      { method: "GET" as const, url: "/api/balances" },
       {
         method: "POST" as const,
-        url: "/transfers",
+        url: "/api/transfers",
         payload: {
           fromAccountId: copAccountId,
           toAccountId: copDestinationId,
@@ -116,7 +116,7 @@ describe("movements module", () => {
 
     const expense = await app.inject({
       method: "POST",
-      url: "/movements",
+      url: "/api/movements",
       headers: { cookie: userACookie },
       payload: {
         accountId: copAccountId,
@@ -129,7 +129,7 @@ describe("movements module", () => {
     });
     expect(expense.statusCode).toBe(201);
     const expenseId = expense.json().id;
-    expect(balance(await app.inject({ method: "GET", url: "/balances", headers: { cookie: userACookie } }), copAccountId)).toBe(-50_000);
+    expect(balance(await app.inject({ method: "GET", url: "/api/balances", headers: { cookie: userACookie } }), copAccountId)).toBe(-50_000);
 
     const income = await createMovement("income", 200_000, "2026-07-29");
     expect(income.statusCode).toBe(201);
@@ -142,7 +142,7 @@ describe("movements module", () => {
     for (const amount of [0, -1, 1.5]) {
       const invalid = await app.inject({
         method: "POST",
-        url: "/movements",
+        url: "/api/movements",
         headers: { cookie: userACookie },
         payload: {
           accountId: copAccountId,
@@ -159,7 +159,7 @@ describe("movements module", () => {
     ]) {
       const invalid = await app.inject({
         method: "POST",
-        url: "/movements",
+        url: "/api/movements",
         headers: { cookie: userACookie },
         payload: { accountId: copAccountId, ...payload },
       });
@@ -170,7 +170,7 @@ describe("movements module", () => {
       (
         await app.inject({
           method: "POST",
-          url: "/movements",
+          url: "/api/movements",
           headers: { cookie: userACookie },
           payload: {
             accountId: userBAccountId,
@@ -185,7 +185,7 @@ describe("movements module", () => {
       (
         await app.inject({
           method: "POST",
-          url: "/movements",
+          url: "/api/movements",
           headers: { cookie: userACookie },
           payload: {
             accountId: archivedAccountId,
@@ -200,7 +200,7 @@ describe("movements module", () => {
       (
         await app.inject({
           method: "POST",
-          url: "/movements",
+          url: "/api/movements",
           headers: { cookie: userACookie },
           payload: {
             accountId: copAccountId,
@@ -215,7 +215,7 @@ describe("movements module", () => {
 
     const sameCurrencyTransfer = await app.inject({
       method: "POST",
-      url: "/transfers",
+      url: "/api/transfers",
       headers: { cookie: userACookie },
       payload: {
         fromAccountId: copAccountId,
@@ -243,7 +243,7 @@ describe("movements module", () => {
 
     const fxTransfer = await app.inject({
       method: "POST",
-      url: "/transfers",
+      url: "/api/transfers",
       headers: { cookie: userACookie },
       payload: {
         fromAccountId: copAccountId,
@@ -281,7 +281,7 @@ describe("movements module", () => {
     ]) {
       const invalid = await app.inject({
         method: "POST",
-        url: "/transfers",
+        url: "/api/transfers",
         headers: { cookie: userACookie },
         payload,
       });
@@ -291,21 +291,21 @@ describe("movements module", () => {
     const transferMovementId = fxTransfer.json().movements[0].id;
     const immutablePatch = await app.inject({
       method: "PATCH",
-      url: `/movements/${transferMovementId}`,
+      url: `/api/movements/${transferMovementId}`,
       headers: { cookie: userACookie },
       payload: { amount: 1 },
     });
     expect(immutablePatch.statusCode).toBe(400);
     const immutableDelete = await app.inject({
       method: "DELETE",
-      url: `/movements/${transferMovementId}`,
+      url: `/api/movements/${transferMovementId}`,
       headers: { cookie: userACookie },
     });
     expect(immutableDelete.statusCode).toBe(400);
 
     const deleteSameTransfer = await app.inject({
       method: "DELETE",
-      url: `/transfers/${sameTransferId}`,
+      url: `/api/transfers/${sameTransferId}`,
       headers: { cookie: userACookie },
     });
     expect(deleteSameTransfer.statusCode).toBe(204);
@@ -313,21 +313,21 @@ describe("movements module", () => {
     expect(await balanceFor(copDestinationId)).toBeUndefined();
     const remainingSameTransferMovements = await app.inject({
       method: "GET",
-      url: `/movements?accountId=${copDestinationId}`,
+      url: `/api/movements?accountId=${copDestinationId}`,
       headers: { cookie: userACookie },
     });
     expect(remainingSameTransferMovements.json()).toEqual([]);
 
     const patchSimple = await app.inject({
       method: "PATCH",
-      url: `/movements/${expenseId}`,
+      url: `/api/movements/${expenseId}`,
       headers: { cookie: userACookie },
       payload: { categoryId: userACategoryId },
     });
     expect(patchSimple.statusCode).toBe(200);
     const changeAmount = await app.inject({
       method: "PATCH",
-      url: `/movements/${expenseId}`,
+      url: `/api/movements/${expenseId}`,
       headers: { cookie: userACookie },
       payload: { amount: 70_000 },
     });
@@ -336,53 +336,53 @@ describe("movements module", () => {
 
     const byAccount = await app.inject({
       method: "GET",
-      url: `/movements?accountId=${copAccountId}`,
+      url: `/api/movements?accountId=${copAccountId}`,
       headers: { cookie: userACookie },
     });
     expect(byAccount.statusCode).toBe(200);
     expect(byAccount.json().every((row: { accountId: string }) => row.accountId === copAccountId)).toBe(true);
     const byType = await app.inject({
       method: "GET",
-      url: "/movements?type=expense",
+      url: "/api/movements?type=expense",
       headers: { cookie: userACookie },
     });
     expect(byType.json()).toHaveLength(1);
     const byDate = await app.inject({
       method: "GET",
-      url: "/movements?from=2026-07-29&to=2026-07-29",
+      url: "/api/movements?from=2026-07-29&to=2026-07-29",
       headers: { cookie: userACookie },
     });
     expect(byDate.json()).toHaveLength(1);
     const limited = await app.inject({
       method: "GET",
-      url: `/movements?accountId=${copAccountId}&limit=1&offset=1`,
+      url: `/api/movements?accountId=${copAccountId}&limit=1&offset=1`,
       headers: { cookie: userACookie },
     });
     expect(limited.json()).toHaveLength(1);
 
     const userBMovements = await app.inject({
       method: "GET",
-      url: "/movements",
+      url: "/api/movements",
       headers: { cookie: userBCookie },
     });
     expect(userBMovements.statusCode).toBe(200);
     expect(userBMovements.json()).toEqual([]);
     const userBBalances = await app.inject({
       method: "GET",
-      url: "/balances",
+      url: "/api/balances",
       headers: { cookie: userBCookie },
     });
     expect(userBBalances.json()).toEqual([]);
     const userBDelete = await app.inject({
       method: "DELETE",
-      url: `/transfers/${fxTransferId}`,
+      url: `/api/transfers/${fxTransferId}`,
       headers: { cookie: userBCookie },
     });
     expect(userBDelete.statusCode).toBe(404);
 
     const deleteFxTransfer = await app.inject({
       method: "DELETE",
-      url: `/transfers/${fxTransferId}`,
+      url: `/api/transfers/${fxTransferId}`,
       headers: { cookie: userACookie },
     });
     expect(deleteFxTransfer.statusCode).toBe(204);
@@ -411,7 +411,7 @@ describe("movements module", () => {
   async function createAccount(name: string, currencyCode: string, cookie: string) {
     const response = await app.inject({
       method: "POST",
-      url: "/accounts",
+      url: "/api/accounts",
       headers: { cookie },
       payload: { name, type: "bank", currencyCode },
     });
@@ -422,7 +422,7 @@ describe("movements module", () => {
   async function createCategory(name: string, cookie: string) {
     const response = await app.inject({
       method: "POST",
-      url: "/categories",
+      url: "/api/categories",
       headers: { cookie },
       payload: { name },
     });
@@ -433,7 +433,7 @@ describe("movements module", () => {
   async function createMovement(type: string, amount: number, occurredAt: string) {
     return app.inject({
       method: "POST",
-      url: "/movements",
+      url: "/api/movements",
       headers: { cookie: userACookie },
       payload: { accountId: copAccountId, type, amount, occurredAt },
     });
@@ -442,7 +442,7 @@ describe("movements module", () => {
   async function balanceFor(accountId: string): Promise<number | undefined> {
     const response = await app.inject({
       method: "GET",
-      url: "/balances",
+      url: "/api/balances",
       headers: { cookie: userACookie },
     });
     return balance(response, accountId);

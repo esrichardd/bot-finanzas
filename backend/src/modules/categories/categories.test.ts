@@ -69,13 +69,13 @@ describe("categories module", () => {
   it("supports scoped system and user categories", async () => {
     const unauthenticated = await app.inject({
       method: "GET",
-      url: "/categories",
+      url: "/api/categories",
     });
     expect(unauthenticated.statusCode).toBe(401);
 
     const initialList = await app.inject({
       method: "GET",
-      url: "/categories",
+      url: "/api/categories",
       headers: { cookie: userACookie },
     });
     expect(initialList.statusCode).toBe(200);
@@ -87,7 +87,7 @@ describe("categories module", () => {
 
     const create = await app.inject({
       method: "POST",
-      url: "/categories",
+      url: "/api/categories",
       headers: { cookie: userACookie },
       payload: {
         name: "Gimnasio",
@@ -107,7 +107,7 @@ describe("categories module", () => {
 
     const invalidColor = await app.inject({
       method: "POST",
-      url: "/categories",
+      url: "/api/categories",
       headers: { cookie: userACookie },
       payload: { name: "Color inválido", color: "verde" },
     });
@@ -115,7 +115,7 @@ describe("categories module", () => {
 
     const userBList = await app.inject({
       method: "GET",
-      url: "/categories",
+      url: "/api/categories",
       headers: { cookie: userBCookie },
     });
     expect(userBList.statusCode).toBe(200);
@@ -126,7 +126,7 @@ describe("categories module", () => {
 
     const userBUpdate = await app.inject({
       method: "PATCH",
-      url: `/categories/${userACategoryId}`,
+      url: `/api/categories/${userACategoryId}`,
       headers: { cookie: userBCookie },
       payload: { name: "Gimnasio ajeno" },
     });
@@ -134,7 +134,7 @@ describe("categories module", () => {
 
     const subcategory = await app.inject({
       method: "POST",
-      url: "/categories",
+      url: "/api/categories",
       headers: { cookie: userACookie },
       payload: { name: "Suplementos", parentId: userACategoryId },
     });
@@ -147,7 +147,7 @@ describe("categories module", () => {
 
     const thirdLevel = await app.inject({
       method: "POST",
-      url: "/categories",
+      url: "/api/categories",
       headers: { cookie: userACookie },
       payload: { name: "Proteína", parentId: userASubcategoryId },
     });
@@ -155,7 +155,7 @@ describe("categories module", () => {
 
     const systemUpdate = await app.inject({
       method: "PATCH",
-      url: `/categories/${SYSTEM_CATEGORY_ID}`,
+      url: `/api/categories/${SYSTEM_CATEGORY_ID}`,
       headers: { cookie: userACookie },
       payload: { name: "Hackeada" },
     });
@@ -163,14 +163,14 @@ describe("categories module", () => {
 
     const systemArchive = await app.inject({
       method: "DELETE",
-      url: `/categories/${SYSTEM_CATEGORY_ID}`,
+      url: `/api/categories/${SYSTEM_CATEGORY_ID}`,
       headers: { cookie: userACookie },
     });
     expect(systemArchive.statusCode).toBe(404);
 
     const duplicate = await app.inject({
       method: "POST",
-      url: "/categories",
+      url: "/api/categories",
       headers: { cookie: userACookie },
       payload: { name: "Gimnasio" },
     });
@@ -178,14 +178,14 @@ describe("categories module", () => {
 
     const archive = await app.inject({
       method: "DELETE",
-      url: `/categories/${userACategoryId}`,
+      url: `/api/categories/${userACategoryId}`,
       headers: { cookie: userACookie },
     });
     expect(archive.statusCode).toBe(204);
 
     const afterArchive = await app.inject({
       method: "GET",
-      url: "/categories",
+      url: "/api/categories",
       headers: { cookie: userACookie },
     });
     expect(afterArchive.statusCode).toBe(200);
@@ -198,7 +198,7 @@ describe("categories module", () => {
 
     const activeCategory = await app.inject({
       method: "POST",
-      url: "/categories",
+      url: "/api/categories",
       headers: { cookie: userACookie },
       payload: { name: "Categoría activa para movimientos" },
     });
@@ -207,7 +207,7 @@ describe("categories module", () => {
 
     const archivedParentChild = await app.inject({
       method: "POST",
-      url: "/categories",
+      url: "/api/categories",
       headers: { cookie: userACookie },
       payload: { name: "No permitido", parentId: userACategoryId },
     });

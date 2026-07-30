@@ -39,12 +39,17 @@ export function buildServer({
   const requireAuth = buildRequireAuth(auth);
 
   app.register(healthRoutes, { db });
-  app.register(authRoutes, { auth });
-  app.register(usersRoutes, { requireAuth });
-  app.register(categoriesRoutes, { db, requireAuth });
-  app.register(accountsRoutes, { db, requireAuth });
-  app.register(movementsRoutes, { db, requireAuth });
-  app.register(creditCardsRoutes, { db, requireAuth });
+  app.register(
+    async (api) => {
+      api.register(authRoutes, { auth });
+      api.register(usersRoutes, { requireAuth });
+      api.register(categoriesRoutes, { db, requireAuth });
+      api.register(accountsRoutes, { db, requireAuth });
+      api.register(movementsRoutes, { db, requireAuth });
+      api.register(creditCardsRoutes, { db, requireAuth });
+    },
+    { prefix: "/api" },
+  );
 
   if (closeDb) {
     app.addHook("onClose", closeDb);

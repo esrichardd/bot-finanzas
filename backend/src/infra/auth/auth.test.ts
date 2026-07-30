@@ -46,7 +46,7 @@ describe("email and password authentication", () => {
   });
 
   it("rejects an unauthenticated request to /me", async () => {
-    const response = await app.inject({ method: "GET", url: "/me" });
+    const response = await app.inject({ method: "GET", url: "/api/me" });
 
     expect(response.statusCode).toBe(401);
     expect(response.json()).toEqual({ error: "UNAUTHORIZED" });
@@ -77,7 +77,7 @@ describe("email and password authentication", () => {
   it("returns the authenticated user from /me", async () => {
     const response = await app.inject({
       method: "GET",
-      url: "/me",
+      url: "/api/me",
       headers: { cookie },
     });
 
@@ -113,7 +113,7 @@ describe("email and password authentication", () => {
 
     const me = await app.inject({
       method: "GET",
-      url: "/me",
+      url: "/api/me",
       headers: { cookie },
     });
 

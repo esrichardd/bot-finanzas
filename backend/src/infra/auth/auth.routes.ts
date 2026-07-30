@@ -19,7 +19,7 @@ export async function authRoutes(
 ): Promise<void> {
   app.route({
     method: ["GET", "POST"],
-    url: "/api/auth/*",
+    url: "/auth/*",
     async handler(request, reply) {
       const url = new URL(request.url, `http://${request.headers.host}`);
       const webRequest = new Request(url.toString(), {

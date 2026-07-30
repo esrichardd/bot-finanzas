@@ -67,19 +67,19 @@ describe("accounts module", () => {
   it("supports currencies and strictly scoped account lifecycle", async () => {
     const unauthenticatedAccounts = await app.inject({
       method: "GET",
-      url: "/accounts",
+      url: "/api/accounts",
     });
     expect(unauthenticatedAccounts.statusCode).toBe(401);
 
     const unauthenticatedCurrencies = await app.inject({
       method: "GET",
-      url: "/currencies",
+      url: "/api/currencies",
     });
     expect(unauthenticatedCurrencies.statusCode).toBe(401);
 
     const currencies = await app.inject({
       method: "GET",
-      url: "/currencies",
+      url: "/api/currencies",
       headers: { cookie: userACookie },
     });
     expect(currencies.statusCode).toBe(200);
@@ -124,7 +124,7 @@ describe("accounts module", () => {
 
     const create = await app.inject({
       method: "POST",
-      url: "/accounts",
+      url: "/api/accounts",
       headers: { cookie: userACookie },
       payload: {
         name: "Bancolombia Ahorros",
@@ -145,7 +145,7 @@ describe("accounts module", () => {
 
     const unknownCurrency = await app.inject({
       method: "POST",
-      url: "/accounts",
+      url: "/api/accounts",
       headers: { cookie: userACookie },
       payload: {
         name: "Revolut",
@@ -158,7 +158,7 @@ describe("accounts module", () => {
 
     const invalidType = await app.inject({
       method: "POST",
-      url: "/accounts",
+      url: "/api/accounts",
       headers: { cookie: userACookie },
       payload: {
         name: "Algo",
@@ -171,7 +171,7 @@ describe("accounts module", () => {
     for (const name of ["Binance USD", "Binance BTC", "Binance ETH"]) {
       const cryptoAccount = await app.inject({
         method: "POST",
-        url: "/accounts",
+        url: "/api/accounts",
         headers: { cookie: userACookie },
         payload: {
           name,
@@ -191,7 +191,7 @@ describe("accounts module", () => {
 
     const btcAccount = await app.inject({
       method: "POST",
-      url: "/accounts",
+      url: "/api/accounts",
       headers: { cookie: userACookie },
       payload: {
         name: "Binance BTC real",
@@ -204,7 +204,7 @@ describe("accounts module", () => {
 
     const purchase = await app.inject({
       method: "POST",
-      url: "/transfers",
+      url: "/api/transfers",
       headers: { cookie: userACookie },
       payload: {
         fromAccountId: binanceUsdId,
@@ -217,7 +217,7 @@ describe("accounts module", () => {
     expect(purchase.statusCode).toBe(201);
     const balances = await app.inject({
       method: "GET",
-      url: "/balances",
+      url: "/api/balances",
       headers: { cookie: userACookie },
     });
     expect(balances.statusCode).toBe(200);
@@ -228,7 +228,7 @@ describe("accounts module", () => {
 
     const userBList = await app.inject({
       method: "GET",
-      url: "/accounts",
+      url: "/api/accounts",
       headers: { cookie: userBCookie },
     });
     expect(userBList.statusCode).toBe(200);
@@ -236,7 +236,7 @@ describe("accounts module", () => {
 
     const userBUpdate = await app.inject({
       method: "PATCH",
-      url: `/accounts/${userAAccountId}`,
+      url: `/api/accounts/${userAAccountId}`,
       headers: { cookie: userBCookie },
       payload: { name: "Cuenta ajena" },
     });
@@ -244,7 +244,7 @@ describe("accounts module", () => {
 
     const currencyUpdate = await app.inject({
       method: "PATCH",
-      url: `/accounts/${userAAccountId}`,
+      url: `/api/accounts/${userAAccountId}`,
       headers: { cookie: userACookie },
       payload: { currencyCode: "USD" },
     });
@@ -252,7 +252,7 @@ describe("accounts module", () => {
 
     const typeUpdate = await app.inject({
       method: "PATCH",
-      url: `/accounts/${userAAccountId}`,
+      url: `/api/accounts/${userAAccountId}`,
       headers: { cookie: userACookie },
       payload: { type: "cash" },
     });
@@ -260,7 +260,7 @@ describe("accounts module", () => {
 
     const renamed = await app.inject({
       method: "PATCH",
-      url: `/accounts/${userAAccountId}`,
+      url: `/api/accounts/${userAAccountId}`,
       headers: { cookie: userACookie },
       payload: { name: "Bancolombia Principal" },
     });
@@ -274,7 +274,7 @@ describe("accounts module", () => {
 
     const clearInstitution = await app.inject({
       method: "PATCH",
-      url: `/accounts/${userAAccountId}`,
+      url: `/api/accounts/${userAAccountId}`,
       headers: { cookie: userACookie },
       payload: { institution: null },
     });
@@ -286,7 +286,7 @@ describe("accounts module", () => {
 
     const duplicate = await app.inject({
       method: "POST",
-      url: "/accounts",
+      url: "/api/accounts",
       headers: { cookie: userACookie },
       payload: {
         name: "Bancolombia Principal",
@@ -298,14 +298,14 @@ describe("accounts module", () => {
 
     const archive = await app.inject({
       method: "DELETE",
-      url: `/accounts/${userAAccountId}`,
+      url: `/api/accounts/${userAAccountId}`,
       headers: { cookie: userACookie },
     });
     expect(archive.statusCode).toBe(204);
 
     const afterArchive = await app.inject({
       method: "GET",
-      url: "/accounts",
+      url: "/api/accounts",
       headers: { cookie: userACookie },
     });
     expect(afterArchive.statusCode).toBe(200);
@@ -317,7 +317,7 @@ describe("accounts module", () => {
 
     const recreate = await app.inject({
       method: "POST",
-      url: "/accounts",
+      url: "/api/accounts",
       headers: { cookie: userACookie },
       payload: {
         name: "Bancolombia Principal",

@@ -58,10 +58,10 @@ describe("credit cards module", () => {
 
   it("scopes access, configures a card, and derives debt and dates", async () => {
     for (const request of [
-      { method: "GET" as const, url: `/accounts/${cardAccountId}/credit-card` },
+      { method: "GET" as const, url: `/api/accounts/${cardAccountId}/credit-card` },
       {
         method: "PUT" as const,
-        url: `/accounts/${cardAccountId}/credit-card`,
+        url: `/api/accounts/${cardAccountId}/credit-card`,
         payload: { creditLimit: 2_000_000, cutDay: 15, paymentDueDay: 30 },
       },
     ]) {
@@ -70,7 +70,7 @@ describe("credit cards module", () => {
 
     const bank = await app.inject({
       method: "PUT",
-      url: `/accounts/${bankAccountId}/credit-card`,
+      url: `/api/accounts/${bankAccountId}/credit-card`,
       headers: { cookie: userACookie },
       payload: { creditLimit: 2_000_000, cutDay: 15, paymentDueDay: 30 },
     });
@@ -79,7 +79,7 @@ describe("credit cards module", () => {
 
     const otherUser = await app.inject({
       method: "PUT",
-      url: `/accounts/${userBCardAccountId}/credit-card`,
+      url: `/api/accounts/${userBCardAccountId}/credit-card`,
       headers: { cookie: userACookie },
       payload: { creditLimit: 2_000_000, cutDay: 15, paymentDueDay: 30 },
     });
@@ -87,14 +87,14 @@ describe("credit cards module", () => {
 
     const unconfigured = await app.inject({
       method: "GET",
-      url: `/accounts/${cardAccountId}/credit-card`,
+      url: `/api/accounts/${cardAccountId}/credit-card`,
       headers: { cookie: userACookie },
     });
     expect(unconfigured.statusCode).toBe(404);
 
     const configured = await app.inject({
       method: "PUT",
-      url: `/accounts/${cardAccountId}/credit-card`,
+      url: `/api/accounts/${cardAccountId}/credit-card`,
       headers: { cookie: userACookie },
       payload: {
         creditLimit: 2_000_000,
@@ -118,7 +118,7 @@ describe("credit cards module", () => {
 
     const expense = await app.inject({
       method: "POST",
-      url: "/movements",
+      url: "/api/movements",
       headers: { cookie: userACookie },
       payload: {
         accountId: cardAccountId,
@@ -131,7 +131,7 @@ describe("credit cards module", () => {
 
     const indebted = await app.inject({
       method: "GET",
-      url: `/accounts/${cardAccountId}/credit-card`,
+      url: `/api/accounts/${cardAccountId}/credit-card`,
       headers: { cookie: userACookie },
     });
     expect(indebted.json()).toMatchObject({
@@ -142,7 +142,7 @@ describe("credit cards module", () => {
 
     const payment = await app.inject({
       method: "POST",
-      url: "/transfers",
+      url: "/api/transfers",
       headers: { cookie: userACookie },
       payload: {
         fromAccountId: bankAccountId,
@@ -155,14 +155,14 @@ describe("credit cards module", () => {
 
     const paid = await app.inject({
       method: "GET",
-      url: `/accounts/${cardAccountId}/credit-card`,
+      url: `/api/accounts/${cardAccountId}/credit-card`,
       headers: { cookie: userACookie },
     });
     expect(paid.json()).toMatchObject({ balance: 0, debt: 0, availableCredit: 2_000_000 });
 
     const updated = await app.inject({
       method: "PUT",
-      url: `/accounts/${cardAccountId}/credit-card`,
+      url: `/api/accounts/${cardAccountId}/credit-card`,
       headers: { cookie: userACookie },
       payload: { creditLimit: 3_000_000, cutDay: 31, paymentDueDay: 31 },
     });
@@ -172,7 +172,7 @@ describe("credit cards module", () => {
     for (const invalidDay of [0, 32]) {
       const invalid = await app.inject({
         method: "PUT",
-        url: `/accounts/${cardAccountId}/credit-card`,
+        url: `/api/accounts/${cardAccountId}/credit-card`,
         headers: { cookie: userACookie },
         payload: { creditLimit: 2_000_000, cutDay: invalidDay, paymentDueDay: 30 },
       });
@@ -194,7 +194,7 @@ describe("credit cards module", () => {
   async function createAccount(name: string, type: "bank" | "credit_card", cookie: string) {
     const response = await app.inject({
       method: "POST",
-      url: "/accounts",
+      url: "/api/accounts",
       headers: { cookie },
       payload: { name, type, currencyCode: "COP" },
     });
