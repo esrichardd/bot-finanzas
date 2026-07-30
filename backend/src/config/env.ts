@@ -1,11 +1,15 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { z } from "zod";
 
 // Único .env del sistema: el de la raíz del repo (regla de ARCHITECTURE.md).
 // Resuelto relativo a ESTE archivo, no al cwd. En Docker no existe y no hace nada: las vars llegan inyectadas por el compose (que además tienen prioridad, dotenv nunca pisa variables ya definidas).
 dotenv.config({
-  path: path.resolve(import.meta.dirname, "../../../.env"), // src/config/ → raíz del repo
+  path: path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../../../.env",
+  ), // src/config/ → raíz del repo
   quiet: true,
 });
 
@@ -18,6 +22,8 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace"])
     .default("info"),
+  BETTER_AUTH_SECRET: z.string().min(32),
+  BETTER_AUTH_URL: z.string().url().default("http://localhost:3000"),
 });
 
 const parsed = envSchema.safeParse(process.env);

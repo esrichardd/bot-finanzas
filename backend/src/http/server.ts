@@ -6,7 +6,11 @@ import {
 import type { Env } from "../config/env.js";
 import { errorHandler } from "./error-handler.js";
 import { createDb, type Database } from "../infra/db/client.js";
+import { createAuth } from "../infra/auth/auth.js";
+import { authRoutes } from "../infra/auth/auth.routes.js";
+import { buildRequireAuth } from "../infra/auth/require-auth.js";
 import { healthRoutes } from "../modules/health/health.routes.js";
+import { usersRoutes } from "../modules/users/users.routes.js";
 
 export interface ServerDependencies {
   env: Env;
@@ -25,7 +29,14 @@ export function buildServer({
   app.setSerializerCompiler(serializerCompiler);
   app.setErrorHandler(errorHandler);
 
+  app.decorateRequest("user", null);
+
+  const auth = createAuth(db, env);
+  const requireAuth = buildRequireAuth(auth);
+
   app.register(healthRoutes, { db });
+  app.register(authRoutes, { auth });
+  app.register(usersRoutes, { requireAuth });
 
   if (closeDb) {
     app.addHook("onClose", closeDb);
