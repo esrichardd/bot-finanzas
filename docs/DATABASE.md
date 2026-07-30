@@ -125,7 +125,8 @@ Notas del diagrama: `USER` es la tabla de Better Auth (referenciada, no modifica
 | SPEC-002 ✅ | `categories`                                               | Estrena el patrón de módulo de dominio               |
 | SPEC-003 ✅ | `currencies` (seed USD, COP) + `accounts`                  | Sin satélite de tarjeta todavía                      |
 | SPEC-004 ✅ | `movements` + `transfers`                                  | El corazón: ledger, FX, comisiones, funciones puras  |
-| Futuro      | `credit_card_details`                                      | Satélite 1:1 + lógica de corte/pago                  |
-| Futuro      | monedas crypto (seed) + `asset_prices`                     | Valoración de portafolio; precios vía adapter de API |
+| SPEC-005 ✅ | `credit_card_details`                                      | Satélite 1:1 + lógica de corte/pago                  |
+| SPEC-005 ✅ | monedas crypto (seed)                                      | BTC, ETH, SOL y USDT; sin valoración todavía         |
+| Futuro      | `asset_prices`                                             | Valoración de portafolio; precios vía adapter de API |
 
 Propiedad que valida el diseño: las extensiones futuras **agregan** tablas y filas — no modifican las existentes. Si un spec futuro necesita alterar `movements` o `accounts` estructuralmente, revisar primero si la decisión correspondiente (D1–D5) sigue vigente.
