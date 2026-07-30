@@ -120,7 +120,7 @@ Notas del diagrama: `USER` es la tabla de Better Auth (referenciada, no modifica
 | Spec        | Tablas                                                     | Nota                                                 |
 | ----------- | ---------------------------------------------------------- | ---------------------------------------------------- |
 | SPEC-001 ✅ | `user`, `session`, `account`, `verification` (Better Auth) | Identidad                                            |
-| SPEC-002    | `categories`                                               | Estrena el patrón de módulo de dominio               |
+| SPEC-002 ✅ | `categories`                                               | Estrena el patrón de módulo de dominio               |
 | SPEC-003    | `currencies` (seed USD, COP) + `accounts`                  | Sin satélite de tarjeta todavía                      |
 | SPEC-004    | `movements` + `transfers`                                  | El corazón: ledger, FX, comisiones, funciones puras  |
 | Futuro      | `credit_card_details`                                      | Satélite 1:1 + lógica de corte/pago                  |

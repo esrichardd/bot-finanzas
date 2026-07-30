@@ -15,6 +15,20 @@
       "when": 1785438057161,
       "tag": "0001_milky_norrin_radd",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785445751951,
+      "tag": "0002_last_the_enforcers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785445772592,
+      "tag": "0003_seed-system-categories",
+      "breakpoints": true
     }
   ]
 }
