@@ -1,0 +1,34 @@
+import path from "node:path";
+import dotenv from "dotenv";
+import { z } from "zod";
+
+// Único .env del sistema: el de la raíz del repo (regla de ARCHITECTURE.md).
+// Resuelto relativo a ESTE archivo, no al cwd. En Docker no existe y no hace nada: las vars llegan inyectadas por el compose (que además tienen prioridad, dotenv nunca pisa variables ya definidas).
+dotenv.config({
+  path: path.resolve(import.meta.dirname, "../../../.env"), // src/config/ → raíz del repo
+  quiet: true,
+});
+
+const envSchema = z.object({
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
+  PORT: z.coerce.number().int().positive().max(65535).default(3000),
+  DATABASE_URL: z.string().url().startsWith("postgres"),
+  LOG_LEVEL: z
+    .enum(["fatal", "error", "warn", "info", "debug", "trace"])
+    .default("info"),
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error("❌ Configuración de entorno inválida:");
+  for (const issue of parsed.error.issues) {
+    console.error(`  - ${issue.path.join(".")}: ${issue.message}`);
+  }
+  process.exit(1);
+}
+
+export const env = parsed.data;
+export type Env = z.infer<typeof envSchema>;
