@@ -1,5 +1,7 @@
 # SPEC-000: Bootstrap del proyecto
 
+**Estado: ✅ completado — 2026-07-30**
+
 Plan de inicialización. Ejecutar cumpliendo `ARCHITECTURE.md` (documento normativo).
 
 ## Objetivo
@@ -125,10 +127,12 @@ typecheck      → tsc --noEmit
 
 ## Criterios de aceptación
 
-- [ ] `docker compose up` desde la raíz levanta todo desde cero (repo clonado + `.env` copiado) sin pasos manuales extra.
-- [ ] `curl localhost:3000/health` → 200 con `db: "ok"`.
-- [ ] Detener el contenedor de postgres → `/health` responde 503 (no crashea, no cuelga).
-- [ ] `cd backend && npm test` pasa (health integration test) sin depender del compose levantado.
-- [ ] `cd backend && npm run typecheck` limpio en strict.
-- [ ] En prod compose, postgres no publica ningún puerto al host.
-- [ ] No existe ningún `process.env` fuera de `backend/src/config/env.ts`.
+- [x] `docker compose up` desde la raíz levanta todo desde cero (repo clonado + `.env` copiado) sin pasos manuales extra.
+- [x] `curl localhost:3000/health` → 200 con `db: "ok"`.
+- [x] Detener el contenedor de postgres → `/health` responde 503 (no crashea, no cuelga).
+- [x] `cd backend && npm test` pasa (health integration test) sin depender del compose levantado.
+- [x] `cd backend && npm run typecheck` limpio en strict.
+- [x] En prod compose, postgres no publica ningún puerto al host.
+- [x] No existe ningún `process.env` fuera de `backend/src/config/env.ts`.
+
+> Nota: la suite de integración requiere que Docker Desktop esté iniciado para ejecutar Testcontainers.
