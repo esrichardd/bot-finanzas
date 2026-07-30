@@ -40,6 +40,8 @@ Referencia de diseño del modelo de datos. **La fuente de verdad de columnas y t
 
 **Límite conocido:** `bigint` en unidades mínimas soporta hasta 8 decimales cómodamente; monedas con 18 decimales nativos (ETH en wei) se registran a 8 decimales — precisión de sobra para tracking de portafolio personal.
 
+**Corolario — una cuenta = una moneda, siempre.** Una plataforma con varios assets (ej. Binance con BTC, ETH y SOL) son varias cuentas: "Binance BTC", "Binance ETH", "Binance SOL". Nunca cuentas multi-moneda: romperían `balance = SUM(movements)` (unidades inconmensurables). Un swap dentro de la plataforma (USDT→SOL) es una transferencia normal (D2) entre esas cuentas — de ahí sale gratis el costo base para valoración. La agrupación "todo lo de Binance" es presentacional: campo opcional `institution` en accounts (texto libre), usado por frontend/bot/valoración para agrupar y totalizar.
+
 ### D4 — Categorías: una tabla, jerarquía de un nivel, sistema + propias
 
 **Decisión:** tabla única con `parent_id` auto-referencial (el service valida un solo nivel: un padre no puede tener padre) y `user_id` **nullable**: `NULL` = categoría del sistema (visible para todos, no editable), con valor = categoría propia del usuario. El scoping se ajusta: "mis categorías" = `user_id = :me OR user_id IS NULL`.
