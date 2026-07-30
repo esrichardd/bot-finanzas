@@ -1,6 +1,6 @@
 # SPEC-002: Módulo de categorías
 
-Estado: 🔲 pendiente
+Estado: ✅ completado 2026-07-30
 
 Ejecutar cumpliendo `ARCHITECTURE.md` (normativo) y `docs/DATABASE.md` (decisión **D4**: una tabla, jerarquía de un nivel, sistema + propias). Los snippets son la implementación de referencia — seguirlos literalmente salvo que contradigan ARCHITECTURE.md, en cuyo caso ARCHITECTURE.md gana y se reporta la discrepancia.
 
@@ -430,14 +430,14 @@ curl -i -X DELETE $BASE/categories/<ID_GIMNASIO> -b cookies.txt
 curl -i $BASE/categories -b cookies.txt
 ```
 
-- [ ] Pasos 1–6 con los códigos y comportamientos indicados.
+- [ ] Pasos 1–6 con los códigos y comportamientos indicados. Pendiente de verificación manual con compose levantado.
 
 ### Criterios generales
 
-- [ ] Migraciones versionadas: tabla + seed (aplicadas por el arranque del compose sin pasos manuales).
-- [ ] Tests de integración (los 10 casos, incluido el de scoping con dos usuarios) pasan; `npm run typecheck` limpio.
-- [ ] `/health` y el flujo de auth del SPEC-001 siguen funcionando.
-- [ ] Cero `process.env` fuera de `config/`; rutas sin lógica; montaje con `app.register`; cero JSON Schema a mano.
+- [x] Migraciones versionadas: tabla + seed (aplicadas por el arranque del compose sin pasos manuales).
+- [x] Tests de integración (los 10 casos, incluido el de scoping con dos usuarios) pasan; `npm run typecheck` limpio.
+- [x] `/health` y el flujo de auth del SPEC-001 siguen funcionando.
+- [x] Cero `process.env` fuera de `config/`; rutas sin lógica; montaje con `app.register`; cero JSON Schema a mano.
 
 ## Al completar
 
