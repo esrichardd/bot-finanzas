@@ -3,6 +3,9 @@
     "appName": "Finanzas",
     "logout": "Log out",
     "language": "Language",
+    "toggleSidebar": "Toggle navigation",
+    "navigation": "Navigation",
+    "navigationDescription": "Main application navigation",
     "theme": "Theme",
     "loading": "Loading...",
     "errorGeneric": "Something went wrong, please try again",
@@ -24,9 +27,32 @@
     "noAccount": "Don't have an account?",
     "hasAccount": "Already have an account?",
     "errorInvalidCredentials": "Incorrect email or password",
-    "errorGeneric": "Something went wrong, please try again"
+    "errorGeneric": "Something went wrong, please try again",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "passwordHint": "Use at least 8 characters",
+    "errorPasswordTooShort": "Password must be at least 8 characters",
+    "loginCta": "Get clarity back around your money.",
+    "registerCta": "Start giving your money a plan."
   },
   "dashboard": {
+    "eyebrow": "Overview",
     "greeting": "Hello, {name}"
+  },
+  "landing": {
+    "title": "Your money, made clear.",
+    "subtitle": "A calmer way to understand your money and make better decisions every day.",
+    "ctaRegister": "Create account",
+    "ctaLogin": "Log in"
+  },
+  "nav": {
+    "overview": "Overview",
+    "dashboard": "Dashboard",
+    "money": "Money",
+    "movements": "Movements",
+    "accounts": "Accounts",
+    "categories": "Categories",
+    "creditCards": "Credit cards",
+    "crypto": "Crypto"
   }
 }

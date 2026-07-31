@@ -3,6 +3,9 @@
     "appName": "Finanzas",
     "logout": "Cerrar sesión",
     "language": "Idioma",
+    "toggleSidebar": "Mostrar u ocultar navegación",
+    "navigation": "Navegación",
+    "navigationDescription": "Navegación principal de la aplicación",
     "theme": "Tema",
     "loading": "Cargando...",
     "errorGeneric": "Algo salió mal, intenta de nuevo",
@@ -24,9 +27,32 @@
     "noAccount": "¿No tienes cuenta?",
     "hasAccount": "¿Ya tienes cuenta?",
     "errorInvalidCredentials": "Correo o contraseña incorrectos",
-    "errorGeneric": "Algo salió mal, intenta de nuevo"
+    "errorGeneric": "Algo salió mal, intenta de nuevo",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña",
+    "passwordHint": "Usa al menos 8 caracteres",
+    "errorPasswordTooShort": "La contraseña debe tener al menos 8 caracteres",
+    "loginCta": "Vuelve a tener claridad sobre tu dinero.",
+    "registerCta": "Empieza a darle un plan a tu dinero."
   },
   "dashboard": {
+    "eyebrow": "Resumen",
     "greeting": "Hola, {name}"
+  },
+  "landing": {
+    "title": "Tus finanzas, claras.",
+    "subtitle": "Una forma serena de entender tu dinero y tomar mejores decisiones cada día.",
+    "ctaRegister": "Crear cuenta",
+    "ctaLogin": "Iniciar sesión"
+  },
+  "nav": {
+    "overview": "Vista general",
+    "dashboard": "Dashboard",
+    "money": "Dinero",
+    "movements": "Movimientos",
+    "accounts": "Cuentas",
+    "categories": "Categorías",
+    "creditCards": "Tarjetas de crédito",
+    "crypto": "Cripto"
   }
 }
