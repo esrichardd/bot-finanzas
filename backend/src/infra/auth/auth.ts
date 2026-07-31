@@ -9,6 +9,13 @@ export function createAuth(db: Database, env: Env) {
     baseURL: env.BETTER_AUTH_URL,
     basePath: "/api/auth",
     secret: env.BETTER_AUTH_SECRET,
+    trustedOrigins: [
+      env.BETTER_AUTH_URL,
+      ...env.BETTER_AUTH_TRUSTED_ORIGINS
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ],
     database: drizzleAdapter(db, { provider: "pg", schema }),
     emailAndPassword: { enabled: true },
   });

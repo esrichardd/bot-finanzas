@@ -18,4 +18,5 @@ export const auth = createAuth(db, {
   DATABASE_URL: "postgres://cli:cli@localhost:5432/cli-generation-only",
   BETTER_AUTH_SECRET: "cli-generation-only-secret-32-chars!!",
   BETTER_AUTH_URL: "http://localhost:3000",
+  BETTER_AUTH_TRUSTED_ORIGINS: "",
 });

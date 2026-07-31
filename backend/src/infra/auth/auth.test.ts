@@ -34,6 +34,7 @@ describe("email and password authentication", () => {
         DATABASE_URL: container.getConnectionUri(),
         BETTER_AUTH_SECRET: "test-secret-with-at-least-32-characters",
         BETTER_AUTH_URL: "http://localhost:3000",
+        BETTER_AUTH_TRUSTED_ORIGINS: "",
       },
       db: database.db,
     });
