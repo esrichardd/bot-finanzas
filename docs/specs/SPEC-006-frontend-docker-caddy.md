@@ -1,6 +1,6 @@
 # SPEC-006: Frontend en Docker + Caddy
 
-Estado: 🔲 pendiente
+Estado: ✅ completado
 
 Ejecutar cumpliendo `ARCHITECTURE.md` (raíz) y `frontend/ARCHITECTURE.md`. Alcance de infraestructura: NO se escribe ninguna pantalla, feature ni lógica de frontend — solo containerización y routing de mismo origen.
 
@@ -172,7 +172,7 @@ curl -s localhost:3001               # → HTML del scaffold de Next
 curl -si localhost:3001/api/auth/get-session   # → respuesta del BACKEND vía rewrite (no 404 de Next)
 ```
 
-- [ ] El scaffold responde en :3001 y `/api/*` llega al backend a través del rewrite.
+- [x] El scaffold responde en :3001 y `/api/*` llega al backend a través del rewrite.
 
 ### Prod (simulado en local)
 
@@ -184,13 +184,13 @@ curl -sik https://localhost/api/categories     # → 401 del backend (auth reque
 docker compose -f docker-compose.prod.yml ps   # → ningún puerto publicado salvo caddy 80/443
 ```
 
-- [ ] Los cuatro checks pasan (el `-k` es por el certificado interno de localhost; con dominio real no hará falta).
+- [x] Los cuatro checks pasan (el `-k` es por el certificado interno de localhost; con dominio real no hará falta).
 
 ### Generales
 
-- [ ] `docker compose -f docker-compose.prod.yml config` valida sin errores; redes correctas (postgres solo internal, frontend/caddy solo web).
-- [ ] El compose de dev quedó intacto; nada del backend se modificó.
-- [ ] READMEs actualizados.
+- [x] `docker compose -f docker-compose.prod.yml config` valida sin errores; redes correctas (postgres solo internal, frontend/caddy solo web).
+- [x] El compose de dev quedó intacto; nada del backend se modificó.
+- [x] READMEs actualizados.
 
 ## Al completar
 
