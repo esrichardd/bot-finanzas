@@ -45,6 +45,36 @@ services:
       timeout: 5s
       retries: 5
 
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      # Fetches server-side del frontend van directo al backend por la red interna del compose.
+      BACKEND_URL: http://backend:3000
+    restart: unless-stopped
+    networks:
+      - web
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - web
+    depends_on:
+      - backend
+      - frontend
+
 networks:
   internal:
     internal: true
@@ -52,3 +82,5 @@ networks:
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

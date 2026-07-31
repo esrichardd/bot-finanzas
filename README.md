@@ -6,9 +6,10 @@ Sistema personal de control de ingresos y egresos: cuentas, movimientos y comisi
 
 ```
 docker-compose.yml        # dev: postgres + backend con hot reload
-docker-compose.prod.yml   # prod: red interna, healthchecks, restart policies
+docker-compose.prod.yml   # prod: frontend + backend detrás de Caddy
 backend/                  # API Fastify + agente (ver backend/README.md)
-frontend/                 # (futuro) Next.js
+frontend/                 # Next.js App Router (ver frontend/README.md)
+caddy/                    # reverse proxy HTTPS y routing de mismo origen
 docs/
   COMMITS.md              # convención de commits
   specs/                  # specs de trabajo, numerados (SPEC-000, SPEC-001...)
@@ -31,10 +32,15 @@ Postgres queda accesible para tooling local en `127.0.0.1:5432` (solo en dev).
 ## Producción
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-Requiere `.env` con credenciales reales (el compose falla si falta alguna variable). En prod, Postgres no publica ningún puerto al host.
+Requiere `.env` con credenciales reales (el compose falla si falta alguna variable). Caddy es el único servicio que publica puertos (`80` y `443`); Postgres, backend y frontend no publican puertos al host.
+
+`DOMAIN` controla el dominio de Caddy y por defecto es `localhost` para uso local.
+En el VPS, definir `DOMAIN=finanzas.tudominio.com` en `.env`; Caddy gestionará
+el certificado de Let's Encrypt automáticamente. Para producción real, ajustar
+también `BETTER_AUTH_URL=https://<dominio>` en ese `.env`.
 
 ## Documentación
 
