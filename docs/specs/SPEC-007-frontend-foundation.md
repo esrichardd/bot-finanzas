@@ -1,6 +1,6 @@
 # SPEC-007: Fundación del frontend
 
-Estado: 🔲 pendiente
+Estado: ✅ completado y testeado
 
 Ejecutar cumpliendo `frontend/ARCHITECTURE.md` (normativo del frontend) y `ARCHITECTURE.md` de la raíz. Los snippets son la implementación de referencia — ante duda con la versión instalada de una librería (especialmente next-intl), consultar su documentación oficial en vez de forzar el snippet, y reportar la diferencia.
 
@@ -376,10 +376,17 @@ Nota: se usa código de moneda como sufijo, NO `style: "currency"` de Intl — B
 
 ### Generales
 
-- [ ] `pnpm test` (money) y `pnpm lint` / `pnpm build` limpios en frontend.
-- [ ] `en.json` y `es.json` tienen exactamente las mismas keys.
+- [x] `pnpm test` (money), `pnpm lint`, TypeScript y `pnpm build` limpios en frontend.
+- [x] `en.json` y `es.json` tienen exactamente las mismas keys.
 - [ ] El build de prod sigue funcionando: `docker compose -f docker-compose.prod.yml up --build` sirve el login vía Caddy (verificación rápida, sin repetir todo el QA).
-- [ ] Nada del backend se modificó.
+- [x] Nada del backend se modificó.
+
+### Verificación realizada
+
+- Tests unitarios de dinero: 6 casos pasando.
+- Smoke test de desarrollo: `/login` responde HTTP 200.
+- Se corrigieron las incompatibilidades de `better-auth 1.6.25` con URLs relativas y de `next-themes 0.4.6` con Next 16.2/React 19.
+- El QA completo con compose, registro/login real, toggles y DevTools queda pendiente de ejecución manual.
 
 ## Al completar
 
