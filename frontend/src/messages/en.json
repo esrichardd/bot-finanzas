@@ -1,0 +1,32 @@
+{
+  "common": {
+    "appName": "Finanzas",
+    "logout": "Log out",
+    "language": "Language",
+    "theme": "Theme",
+    "loading": "Loading...",
+    "errorGeneric": "Something went wrong, please try again",
+    "retry": "Try again",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "spanish": "Spanish",
+    "english": "English"
+  },
+  "auth": {
+    "loginTitle": "Log in",
+    "registerTitle": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "loginButton": "Log in",
+    "registerButton": "Sign up",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "errorInvalidCredentials": "Incorrect email or password",
+    "errorGeneric": "Something went wrong, please try again"
+  },
+  "dashboard": {
+    "greeting": "Hello, {name}"
+  }
+}

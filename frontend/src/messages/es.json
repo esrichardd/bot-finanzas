@@ -1,0 +1,32 @@
+{
+  "common": {
+    "appName": "Finanzas",
+    "logout": "Cerrar sesión",
+    "language": "Idioma",
+    "theme": "Tema",
+    "loading": "Cargando...",
+    "errorGeneric": "Algo salió mal, intenta de nuevo",
+    "retry": "Reintentar",
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema",
+    "spanish": "Español",
+    "english": "Inglés"
+  },
+  "auth": {
+    "loginTitle": "Iniciar sesión",
+    "registerTitle": "Crear cuenta",
+    "email": "Correo",
+    "password": "Contraseña",
+    "name": "Nombre",
+    "loginButton": "Entrar",
+    "registerButton": "Registrarme",
+    "noAccount": "¿No tienes cuenta?",
+    "hasAccount": "¿Ya tienes cuenta?",
+    "errorInvalidCredentials": "Correo o contraseña incorrectos",
+    "errorGeneric": "Algo salió mal, intenta de nuevo"
+  },
+  "dashboard": {
+    "greeting": "Hola, {name}"
+  }
+}
