@@ -1,6 +1,6 @@
 # SPEC-008: Diseño visual — landing, auth y shell del dashboard
 
-Estado: 🔲 pendiente
+Estado: ✅ completado — 2026-08-02
 
 Ejecutar cumpliendo `frontend/ARCHITECTURE.md`. Este spec define una **dirección de arte concreta y cerrada** — no es una invitación a diseñar: los tokens, fuentes y prohibiciones de abajo son normativos. Ante la duda estética, elegir SIEMPRE la opción más sobria.
 
