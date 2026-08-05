@@ -1,5 +1,5 @@
 import { and, eq, isNull, or, type SQL } from "drizzle-orm";
-import type { Database } from "../../infra/db/client.js";
+import type { Database, DbExecutor } from "../../infra/db/client.js";
 import { ValidationError } from "../../shared/errors.js";
 import { orThrow } from "../../shared/db-helpers.js";
 import { categories } from "./categories.schema.js";
@@ -36,7 +36,7 @@ export async function listCategories(db: Database, userId: string) {
 
 /** Categoría visible (propia o del sistema), activa. Lanza NotFoundError / ValidationError. */
 export async function getAccessibleCategory(
-  db: Database,
+  db: DbExecutor,
   userId: string,
   categoryId: string,
 ) {

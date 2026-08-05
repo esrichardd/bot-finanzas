@@ -24,6 +24,24 @@ export function computeBalance(
   return rows.reduce((acc, row) => acc + signedAmount(row.type, row.amount), 0);
 }
 
+export interface BalanceAdjustment {
+  type: "adjustment_in" | "adjustment_out";
+  amount: number;
+}
+
+export function computeBalanceAdjustment(
+  currentBalance: number,
+  targetBalance: number,
+): BalanceAdjustment | null {
+  const difference = targetBalance - currentBalance;
+  if (difference === 0) return null;
+
+  return {
+    type: difference > 0 ? "adjustment_in" : "adjustment_out",
+    amount: Math.abs(difference),
+  };
+}
+
 /** Tasa derivada de una transferencia FX, solo para display. */
 export function deriveRate(amountFrom: number, amountTo: number): number {
   return amountTo / amountFrom;

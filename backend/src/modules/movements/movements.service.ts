@@ -6,16 +6,25 @@ import {
   lte,
   type SQL,
 } from "drizzle-orm";
-import type { Database } from "../../infra/db/client.js";
-import { getOwnedActiveAccount } from "../accounts/accounts.service.js";
+import type { Database, DbExecutor } from "../../infra/db/client.js";
+import {
+  lockOwnedAccount,
+  lockOwnedActiveAccount,
+} from "../accounts/accounts.service.js";
 import { getAccessibleCategory } from "../categories/categories.service.js";
 import { ownedBy, orThrow } from "../../shared/db-helpers.js";
 import { ValidationError } from "../../shared/errors.js";
-import { computeBalance, type MovementType } from "./movements.calc.js";
+import {
+  computeBalance,
+  computeBalanceAdjustment,
+  type MovementType,
+} from "./movements.calc.js";
+import { AccountAlreadyAtTargetBalanceError } from "./movements.errors.js";
 import { movements, transfers } from "./movements.schema.js";
 import type {
   CreateMovementInput,
   CreateTransferInput,
+  AdjustAccountBalanceInput,
   ListMovementsQuery,
   UpdateMovementInput,
 } from "./movements.types.js";
@@ -38,12 +47,16 @@ function toResponse(row: MovementRow) {
   };
 }
 
+/**
+ * Inserts a movement after locking its account. Callers at the HTTP boundary
+ * must wrap this function in a transaction so the lock covers the insert.
+ */
 export async function createMovement(
-  db: Database,
+  db: DbExecutor,
   userId: string,
   input: CreateMovementInput,
 ) {
-  await getOwnedActiveAccount(db, userId, input.accountId);
+  await lockOwnedActiveAccount(db, userId, input.accountId);
   if (input.categoryId) {
     await getAccessibleCategory(db, userId, input.categoryId);
   }
@@ -93,25 +106,28 @@ export async function updateMovement(
   movementId: string,
   input: UpdateMovementInput,
 ) {
-  const movement = orThrow(
-    await db.query.movements.findFirst({
-      where: ownedBy(movements.userId, userId, eq(movements.id, movementId)),
-    }),
-    "movement",
-  );
-  if (movement.transferId !== null) {
-    throw new ValidationError("Transfer movements are edited via their transfer");
-  }
-  if (input.categoryId) {
-    await getAccessibleCategory(db, userId, input.categoryId);
-  }
+  return db.transaction(async (tx) => {
+    const movement = orThrow(
+      await tx.query.movements.findFirst({
+        where: ownedBy(movements.userId, userId, eq(movements.id, movementId)),
+      }),
+      "movement",
+    );
+    if (movement.transferId !== null) {
+      throw new ValidationError("Transfer movements are edited via their transfer");
+    }
+    await lockOwnedAccount(tx, userId, movement.accountId);
+    if (input.categoryId) {
+      await getAccessibleCategory(tx, userId, input.categoryId);
+    }
 
-  const [updated] = await db
-    .update(movements)
-    .set(input)
-    .where(ownedBy(movements.userId, userId, eq(movements.id, movementId)))
-    .returning();
-  return toResponse(orThrow(updated, "movement"));
+    const [updated] = await tx
+      .update(movements)
+      .set(input)
+      .where(ownedBy(movements.userId, userId, eq(movements.id, movementId)))
+      .returning();
+    return toResponse(orThrow(updated, "movement"));
+  });
 }
 
 export async function deleteMovement(
@@ -119,19 +135,21 @@ export async function deleteMovement(
   userId: string,
   movementId: string,
 ) {
-  const movement = orThrow(
-    await db.query.movements.findFirst({
-      where: ownedBy(movements.userId, userId, eq(movements.id, movementId)),
-    }),
-    "movement",
-  );
-  if (movement.transferId !== null) {
-    throw new ValidationError("Transfer movements are deleted via DELETE /transfers/:id");
-  }
-
-  await db
-    .delete(movements)
-    .where(ownedBy(movements.userId, userId, eq(movements.id, movementId)));
+  await db.transaction(async (tx) => {
+    const movement = orThrow(
+      await tx.query.movements.findFirst({
+        where: ownedBy(movements.userId, userId, eq(movements.id, movementId)),
+      }),
+      "movement",
+    );
+    if (movement.transferId !== null) {
+      throw new ValidationError("Transfer movements are deleted via DELETE /transfers/:id");
+    }
+    await lockOwnedAccount(tx, userId, movement.accountId);
+    await tx
+      .delete(movements)
+      .where(ownedBy(movements.userId, userId, eq(movements.id, movementId)));
+  });
 }
 
 export async function getBalances(db: Database, userId: string) {
@@ -153,7 +171,7 @@ export async function getBalances(db: Database, userId: string) {
 
 /** Balance de una cuenta del usuario (0 si no tiene movimientos). */
 export async function getAccountBalance(
-  db: Database,
+  db: DbExecutor,
   userId: string,
   accountId: string,
 ): Promise<number> {
@@ -164,36 +182,79 @@ export async function getAccountBalance(
   return computeBalance(rows);
 }
 
+export async function adjustAccountBalance(
+  db: Database,
+  userId: string,
+  accountId: string,
+  input: AdjustAccountBalanceInput,
+) {
+  return db.transaction(async (tx) => {
+    await lockOwnedActiveAccount(tx, userId, accountId);
+    const currentBalance = await getAccountBalance(tx, userId, accountId);
+    const targetBalance =
+      input.targetBalance.amount === 0
+        ? 0
+        : input.targetBalance.direction === "in"
+          ? input.targetBalance.amount
+          : -input.targetBalance.amount;
+    const adjustment = computeBalanceAdjustment(currentBalance, targetBalance);
+
+    if (!adjustment) {
+      throw new AccountAlreadyAtTargetBalanceError();
+    }
+
+    return createMovement(tx, userId, {
+      accountId,
+      type: adjustment.type,
+      amount: adjustment.amount,
+      categoryId: null,
+      description: "Ajuste manual de saldo",
+      occurredAt: input.occurredAt,
+    });
+  });
+}
+
 export async function createTransfer(
   db: Database,
   userId: string,
   input: CreateTransferInput,
 ) {
-  const from = await getOwnedActiveAccount(db, userId, input.fromAccountId);
-  const to = await getOwnedActiveAccount(db, userId, input.toAccountId);
-
-  const sameCurrency = from.currencyCode === to.currencyCode;
-  let amountTo: number;
-  if (sameCurrency) {
-    if (input.amountTo !== undefined && input.amountTo !== input.amountFrom) {
-      throw new ValidationError(
-        "Same-currency transfers must have equal amounts; model differences as fee",
-      );
-    }
-    amountTo = input.amountFrom;
-  } else {
-    if (input.amountTo === undefined) {
-      throw new ValidationError("amountTo is required for cross-currency transfers");
-    }
-    amountTo = input.amountTo;
-  }
-
   const feeCategoryId = input.feeCategoryId ?? SYSTEM_FEE_CATEGORY_ID;
-  if (input.feeAmount !== undefined) {
-    await getAccessibleCategory(db, userId, feeCategoryId);
-  }
 
   return db.transaction(async (tx) => {
+    const accountIds = [input.fromAccountId, input.toAccountId].sort();
+    const lockedAccounts = new Map<
+      string,
+      Awaited<ReturnType<typeof lockOwnedActiveAccount>>
+    >();
+    for (const accountId of accountIds) {
+      lockedAccounts.set(
+        accountId,
+        await lockOwnedActiveAccount(tx, userId, accountId),
+      );
+    }
+    const from = lockedAccounts.get(input.fromAccountId)!;
+    const to = lockedAccounts.get(input.toAccountId)!;
+    const sameCurrency = from.currencyCode === to.currencyCode;
+    let amountTo: number;
+    if (sameCurrency) {
+      if (input.amountTo !== undefined && input.amountTo !== input.amountFrom) {
+        throw new ValidationError(
+          "Same-currency transfers must have equal amounts; model differences as fee",
+        );
+      }
+      amountTo = input.amountFrom;
+    } else {
+      if (input.amountTo === undefined) {
+        throw new ValidationError("amountTo is required for cross-currency transfers");
+      }
+      amountTo = input.amountTo;
+    }
+
+    if (input.feeAmount !== undefined) {
+      await getAccessibleCategory(tx, userId, feeCategoryId);
+    }
+
     const [transfer] = await tx.insert(transfers).values({ userId }).returning();
     const transferId = orThrow(transfer, "transfer").id;
     const base = {
@@ -240,14 +301,20 @@ export async function deleteTransfer(
   userId: string,
   transferId: string,
 ) {
-  orThrow(
-    await db.query.transfers.findFirst({
-      where: ownedBy(transfers.userId, userId, eq(transfers.id, transferId)),
-    }),
-    "transfer",
-  );
-
   await db.transaction(async (tx) => {
+    orThrow(
+      await tx.query.transfers.findFirst({
+        where: ownedBy(transfers.userId, userId, eq(transfers.id, transferId)),
+      }),
+      "transfer",
+    );
+    const movementRows = await tx
+      .select({ accountId: movements.accountId })
+      .from(movements)
+      .where(ownedBy(movements.userId, userId, eq(movements.transferId, transferId)));
+    for (const accountId of [...new Set(movementRows.map((row) => row.accountId))].sort()) {
+      await lockOwnedAccount(tx, userId, accountId);
+    }
     await tx
       .delete(movements)
       .where(ownedBy(movements.userId, userId, eq(movements.transferId, transferId)));

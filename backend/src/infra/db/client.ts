@@ -15,3 +15,9 @@ export function createDb(databaseUrl: string) {
 }
 
 export type Database = ReturnType<typeof createDb>["db"];
+
+/** Operaciones disponibles tanto en la DB raíz como dentro de db.transaction. */
+export type DbExecutor = Pick<
+  Database,
+  "select" | "insert" | "update" | "delete" | "query"
+>;

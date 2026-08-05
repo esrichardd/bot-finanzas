@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Database } from "../../infra/db/client.js";
 import {
   balanceResponse,
+  adjustAccountBalanceInput,
   createMovementInput,
   createTransferInput,
   listMovementsQuery,
@@ -15,6 +16,7 @@ import {
 import {
   createMovement,
   createTransfer,
+  adjustAccountBalance,
   deleteMovement,
   deleteTransfer,
   getBalances,
@@ -40,13 +42,36 @@ export async function movementsRoutes(
   );
 
   r.post(
+    "/accounts/:id/balance-adjustments",
+    {
+      preHandler: opts.requireAuth,
+      schema: {
+        params: idParam,
+        body: adjustAccountBalanceInput,
+        response: { 201: movementResponse },
+      },
+    },
+    async (request, reply) => {
+      const movement = await adjustAccountBalance(
+        opts.db,
+        request.user!.id,
+        request.params.id,
+        request.body,
+      );
+      return reply.code(201).send(movement);
+    },
+  );
+
+  r.post(
     "/movements",
     {
       preHandler: opts.requireAuth,
       schema: { body: createMovementInput, response: { 201: movementResponse } },
     },
     async (request, reply) => {
-      const created = await createMovement(opts.db, request.user!.id, request.body);
+      const created = await opts.db.transaction((tx) =>
+        createMovement(tx, request.user!.id, request.body),
+      );
       return reply.code(201).send(created);
     },
   );

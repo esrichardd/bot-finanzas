@@ -5,17 +5,21 @@ import type { Database } from "../../infra/db/client.js";
 import {
   accountListResponse,
   accountResponse,
-  createAccountInput,
   currencyListResponse,
+  listAccountsQuery,
+  openAccountInput,
   updateAccountInput,
 } from "./accounts.types.js";
 import {
-  archiveAccount,
-  createAccount,
   listAccounts,
   listCurrencies,
+  restoreAccount,
   updateAccount,
 } from "./accounts.service.js";
+import {
+  archiveEmptyAccount,
+  openAccount,
+} from "./account-lifecycle.service.js";
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -38,19 +42,23 @@ export async function accountsRoutes(
     "/accounts",
     {
       preHandler: opts.requireAuth,
-      schema: { response: { 200: accountListResponse } },
+      schema: {
+        querystring: listAccountsQuery,
+        response: { 200: accountListResponse },
+      },
     },
-    async (request) => listAccounts(opts.db, request.user!.id),
+    async (request) =>
+      listAccounts(opts.db, request.user!.id, request.query.status),
   );
 
   r.post(
     "/accounts",
     {
       preHandler: opts.requireAuth,
-      schema: { body: createAccountInput, response: { 201: accountResponse } },
+      schema: { body: openAccountInput, response: { 201: accountResponse } },
     },
     async (request, reply) => {
-      const created = await createAccount(
+      const created = await openAccount(
         opts.db,
         request.user!.id,
         request.body,
@@ -80,8 +88,18 @@ export async function accountsRoutes(
       schema: { params: idParam, response: { 204: z.null() } },
     },
     async (request, reply) => {
-      await archiveAccount(opts.db, request.user!.id, request.params.id);
+      await archiveEmptyAccount(opts.db, request.user!.id, request.params.id);
       return reply.code(204).send(null);
     },
+  );
+
+  r.post(
+    "/accounts/:id/restore",
+    {
+      preHandler: opts.requireAuth,
+      schema: { params: idParam, response: { 200: accountResponse } },
+    },
+    async (request) =>
+      restoreAccount(opts.db, request.user!.id, request.params.id),
   );
 }

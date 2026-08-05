@@ -15,6 +15,31 @@ export const createAccountInput = z.object({
 });
 export type CreateAccountInput = z.infer<typeof createAccountInput>;
 
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
+const minorUnits = z
+  .number()
+  .int()
+  .positive()
+  .max(Number.MAX_SAFE_INTEGER);
+
+export const openingBalanceInput = z.object({
+  amount: minorUnits,
+  direction: z.enum(["in", "out"]),
+  occurredAt: isoDate,
+});
+
+export const openAccountInput = createAccountInput.extend({
+  openingBalance: openingBalanceInput.optional(),
+});
+export type OpenAccountInput = z.infer<typeof openAccountInput>;
+
+export const listAccountsQuery = z.object({
+  status: z.enum(["active", "archived"]).default("active"),
+});
+export type ListAccountsQuery = z.infer<typeof listAccountsQuery>;
+
 export const updateAccountInput = z
   .object({
     name: z.string().trim().min(1).max(60),

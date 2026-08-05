@@ -5,8 +5,10 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { user } from "../../infra/auth/auth.schema.js";
 
 export const currencyKind = pgEnum("currency_kind", ["fiat", "crypto"]);
@@ -25,18 +27,26 @@ export const accountType = pgEnum("account_type", [
   "crypto",
 ]);
 
-export const accounts = pgTable("accounts", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id),
-  name: text("name").notNull(),
-  type: accountType("type").notNull(),
-  currencyCode: text("currency_code")
-    .notNull()
-    .references(() => currencies.code),
-  // Agrupación presentacional; no existe una tabla de instituciones.
-  institution: text("institution"),
-  archived: boolean("archived").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
+    name: text("name").notNull(),
+    type: accountType("type").notNull(),
+    currencyCode: text("currency_code")
+      .notNull()
+      .references(() => currencies.code),
+    // Agrupación presentacional; no existe una tabla de instituciones.
+    institution: text("institution"),
+    archived: boolean("archived").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("accounts_active_user_name_unique")
+      .on(table.userId, sql`lower(${table.name})`)
+      .where(sql`${table.archived} = false`),
+  ],
+);

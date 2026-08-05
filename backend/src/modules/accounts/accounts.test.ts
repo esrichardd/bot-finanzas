@@ -353,6 +353,262 @@ describe("accounts module", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
+  it("opens accounts with ledger balances and manages archived lifecycle", async () => {
+    for (const amount of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      const invalid = await app.inject({
+        method: "POST",
+        url: "/api/accounts",
+        headers: { cookie: userACookie },
+        payload: {
+          name: `Invalid opening ${String(amount)}`,
+          type: "bank",
+          currencyCode: "COP",
+          openingBalance: { amount, direction: "in", occurredAt: "2026-08-02" },
+        },
+      });
+      expect(invalid.statusCode).toBe(400);
+    }
+
+    const opening = await app.inject({
+      method: "POST",
+      url: "/api/accounts",
+      headers: { cookie: userACookie },
+      payload: {
+        name: "Cuenta con saldo inicial",
+        type: "bank",
+        currencyCode: "COP",
+        openingBalance: {
+          amount: 250_000,
+          direction: "in",
+          occurredAt: "2026-08-02",
+        },
+      },
+    });
+    expect(opening.statusCode).toBe(201);
+    const accountId = opening.json().id as string;
+
+    const movements = await app.inject({
+      method: "GET",
+      url: `/api/movements?accountId=${accountId}`,
+      headers: { cookie: userACookie },
+    });
+    expect(movements.statusCode).toBe(200);
+    expect(movements.json()).toHaveLength(1);
+    expect(movements.json()[0]).toMatchObject({
+      type: "adjustment_in",
+      amount: 250_000,
+      description: "Saldo inicial",
+      occurredAt: "2026-08-02",
+      source: "manual",
+    });
+
+    const balances = await app.inject({
+      method: "GET",
+      url: "/api/balances",
+      headers: { cookie: userACookie },
+    });
+    expect(balances.json()).toContainEqual({ accountId, balance: 250_000 });
+
+    const negativeOpening = await app.inject({
+      method: "POST",
+      url: "/api/accounts",
+      headers: { cookie: userACookie },
+      payload: {
+        name: "Cuenta sobregirada de prueba",
+        type: "bank",
+        currencyCode: "COP",
+        openingBalance: {
+          amount: 5_000,
+          direction: "out",
+          occurredAt: "2026-08-02",
+        },
+      },
+    });
+    expect(negativeOpening.statusCode).toBe(201);
+    const negativeMovements = await app.inject({
+      method: "GET",
+      url: `/api/movements?accountId=${negativeOpening.json().id}`,
+      headers: { cookie: userACookie },
+    });
+    expect(negativeMovements.json()).toContainEqual(
+      expect.objectContaining({ type: "adjustment_out", amount: 5_000 }),
+    );
+
+    const adjusted = await app.inject({
+      method: "POST",
+      url: `/api/accounts/${accountId}/balance-adjustments`,
+      headers: { cookie: userACookie },
+      payload: {
+        targetBalance: { amount: 70_000, direction: "in" },
+        occurredAt: "2026-08-03",
+      },
+    });
+    expect(adjusted.statusCode).toBe(201);
+    expect(adjusted.json()).toMatchObject({
+      type: "adjustment_out",
+      amount: 180_000,
+      description: "Ajuste manual de saldo",
+    });
+
+    const alreadyAtTarget = await app.inject({
+      method: "POST",
+      url: `/api/accounts/${accountId}/balance-adjustments`,
+      headers: { cookie: userACookie },
+      payload: {
+        targetBalance: { amount: 70_000, direction: "in" },
+        occurredAt: "2026-08-03",
+      },
+    });
+    expect(alreadyAtTarget.statusCode).toBe(400);
+    expect(alreadyAtTarget.json().error).toBe("ACCOUNT_ALREADY_AT_TARGET_BALANCE");
+
+    const cannotArchive = await app.inject({
+      method: "DELETE",
+      url: `/api/accounts/${accountId}`,
+      headers: { cookie: userACookie },
+    });
+    expect(cannotArchive.statusCode).toBe(400);
+    expect(cannotArchive.json().error).toBe("ACCOUNT_BALANCE_NOT_ZERO");
+
+    const zeroed = await app.inject({
+      method: "POST",
+      url: `/api/accounts/${accountId}/balance-adjustments`,
+      headers: { cookie: userACookie },
+      payload: {
+        targetBalance: { amount: 0, direction: "in" },
+        occurredAt: "2026-08-04",
+      },
+    });
+    expect(zeroed.statusCode).toBe(201);
+    expect(zeroed.json()).toMatchObject({ type: "adjustment_out", amount: 70_000 });
+
+    const archived = await app.inject({
+      method: "DELETE",
+      url: `/api/accounts/${accountId}`,
+      headers: { cookie: userACookie },
+    });
+    expect(archived.statusCode).toBe(204);
+
+    const archivedList = await app.inject({
+      method: "GET",
+      url: "/api/accounts?status=archived",
+      headers: { cookie: userACookie },
+    });
+    expect(archivedList.statusCode).toBe(200);
+    expect(archivedList.json()).toContainEqual(expect.objectContaining({ id: accountId, archived: true }));
+
+    const restored = await app.inject({
+      method: "POST",
+      url: `/api/accounts/${accountId}/restore`,
+      headers: { cookie: userACookie },
+    });
+    expect(restored.statusCode).toBe(200);
+    expect(restored.json()).toMatchObject({ id: accountId, archived: false });
+
+    const restoreAgain = await app.inject({
+      method: "POST",
+      url: `/api/accounts/${accountId}/restore`,
+      headers: { cookie: userACookie },
+    });
+    expect(restoreAgain.statusCode).toBe(400);
+    expect(restoreAgain.json().error).toBe("ACCOUNT_ALREADY_ACTIVE");
+
+    const restoreConflictArchived = await app.inject({
+      method: "POST",
+      url: "/api/accounts",
+      headers: { cookie: userACookie },
+      payload: {
+        name: "Cuenta restauración conflictiva",
+        type: "bank",
+        currencyCode: "COP",
+      },
+    });
+    expect(restoreConflictArchived.statusCode).toBe(201);
+    const restoreConflictId = restoreConflictArchived.json().id as string;
+    const archiveForRestoreConflict = await app.inject({
+      method: "DELETE",
+      url: `/api/accounts/${restoreConflictId}`,
+      headers: { cookie: userACookie },
+    });
+    expect(archiveForRestoreConflict.statusCode).toBe(204);
+
+    const activeRestoreConflict = await app.inject({
+      method: "POST",
+      url: "/api/accounts",
+      headers: { cookie: userACookie },
+      payload: {
+        name: "Cuenta restauración conflictiva",
+        type: "bank",
+        currencyCode: "COP",
+      },
+    });
+    expect(activeRestoreConflict.statusCode).toBe(201);
+
+    const restoreConflict = await app.inject({
+      method: "POST",
+      url: `/api/accounts/${restoreConflictId}/restore`,
+      headers: { cookie: userACookie },
+    });
+    expect(restoreConflict.statusCode).toBe(400);
+    expect(restoreConflict.json().error).toBe("ACCOUNT_NAME_CONFLICT");
+
+    const concurrentName = "Cuenta nombre concurrente";
+    const concurrentCreates = await Promise.all(
+      [1, 2].map(() =>
+        app.inject({
+          method: "POST",
+          url: "/api/accounts",
+          headers: { cookie: userACookie },
+          payload: {
+            name: concurrentName,
+            type: "bank",
+            currencyCode: "COP",
+          },
+        }),
+      ),
+    );
+    expect(concurrentCreates.map((response) => response.statusCode).sort()).toEqual([201, 400]);
+
+    const raceAccount = await app.inject({
+      method: "POST",
+      url: "/api/accounts",
+      headers: { cookie: userACookie },
+      payload: {
+        name: "Cuenta carrera de archivado",
+        type: "bank",
+        currencyCode: "COP",
+      },
+    });
+    expect(raceAccount.statusCode).toBe(201);
+    const raceAccountId = raceAccount.json().id as string;
+    const [raceArchive, raceMovement] = await Promise.all([
+      app.inject({
+        method: "DELETE",
+        url: `/api/accounts/${raceAccountId}`,
+        headers: { cookie: userACookie },
+      }),
+      app.inject({
+        method: "POST",
+        url: "/api/movements",
+        headers: { cookie: userACookie },
+        payload: {
+          accountId: raceAccountId,
+          type: "adjustment_in",
+          amount: 1,
+          occurredAt: "2026-08-05",
+        },
+      }),
+    ]);
+    expect(raceArchive.statusCode === 204 && raceMovement.statusCode === 201).toBe(false);
+
+    const invalidStatus = await app.inject({
+      method: "GET",
+      url: "/api/accounts?status=deleted",
+      headers: { cookie: userACookie },
+    });
+    expect(invalidStatus.statusCode).toBe(400);
+  });
+
   async function signUp(email: string, name: string): Promise<string> {
     const response = await app.inject({
       method: "POST",

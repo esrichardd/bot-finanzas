@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "accounts_active_user_name_unique" ON "accounts" USING btree ("user_id",lower("name")) WHERE "accounts"."archived" = false;

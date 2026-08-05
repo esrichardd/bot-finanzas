@@ -64,6 +64,13 @@
       "when": 1785452518006,
       "tag": "0008_seed-crypto-currencies",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785712010611,
+      "tag": "0009_enforce-active-account-name",
+      "breakpoints": true
     }
   ]
 }

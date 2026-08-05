@@ -20,6 +20,23 @@ export const createMovementInput = z.object({
 });
 export type CreateMovementInput = z.infer<typeof createMovementInput>;
 
+const nonNegativeMinorUnits = z
+  .number()
+  .int()
+  .min(0)
+  .max(Number.MAX_SAFE_INTEGER);
+
+export const adjustAccountBalanceInput = z.object({
+  targetBalance: z.object({
+    amount: nonNegativeMinorUnits,
+    direction: z.enum(["in", "out"]),
+  }),
+  occurredAt: isoDate,
+});
+export type AdjustAccountBalanceInput = z.infer<
+  typeof adjustAccountBalanceInput
+>;
+
 export const updateMovementInput = z
   .object({
     amount: minorUnits,
