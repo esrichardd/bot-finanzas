@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availableCredit, currentDebt, nextOccurrence } from "./credit-cards.calc.js";
+import { availableCredit, creditBalance, creditUtilization, currentDebt, nextOccurrence } from "./credit-cards.calc.js";
 
 describe("credit card calculations", () => {
   it("calculates debt from a negative balance", () => {
@@ -11,6 +11,14 @@ describe("credit card calculations", () => {
   it("calculates available credit without going below zero", () => {
     expect(availableCredit(2_000_000, -350_000)).toBe(1_650_000);
     expect(availableCredit(2_000_000, -2_500_000)).toBe(0);
+  });
+
+  it("calculates credit balance and real utilization", () => {
+    expect(creditBalance(25_000)).toBe(25_000);
+    expect(creditBalance(-25_000)).toBe(0);
+    expect(creditUtilization(0, 2_000_000)).toBe(0);
+    expect(creditUtilization(1_000_000, 2_000_000)).toBe(50);
+    expect(creditUtilization(2_500_000, 2_000_000)).toBe(125);
   });
 
   it("calculates the next occurrence and clamps short months", () => {

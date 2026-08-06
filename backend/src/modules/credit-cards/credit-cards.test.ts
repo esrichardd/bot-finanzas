@@ -58,6 +58,15 @@ describe("credit cards module", () => {
   });
 
   it("scopes access, configures a card, and derives debt and dates", async () => {
+    const genericCard = await app.inject({
+      method: "POST",
+      url: "/api/accounts",
+      headers: { cookie: userACookie },
+      payload: { name: "Generic card must be dedicated", type: "credit_card", currencyCode: "COP" },
+    });
+    expect(genericCard.statusCode).toBe(400);
+    expect(genericCard.json().error).toBe("CREDIT_CARD_DEDICATED_FLOW_REQUIRED");
+
     for (const request of [
       { method: "GET" as const, url: `/api/accounts/${cardAccountId}/credit-card` },
       {
@@ -85,13 +94,6 @@ describe("credit cards module", () => {
       payload: { creditLimit: 2_000_000, cutDay: 15, paymentDueDay: 30 },
     });
     expect(otherUser.statusCode).toBe(404);
-
-    const unconfigured = await app.inject({
-      method: "GET",
-      url: `/api/accounts/${cardAccountId}/credit-card`,
-      headers: { cookie: userACookie },
-    });
-    expect(unconfigured.statusCode).toBe(404);
 
     const configured = await app.inject({
       method: "PUT",
@@ -179,6 +181,59 @@ describe("credit cards module", () => {
       });
       expect(invalid.statusCode).toBe(400);
     }
+
+    const aggregate = await app.inject({
+      method: "POST",
+      url: "/api/credit-cards",
+      headers: { cookie: userACookie },
+      payload: {
+        name: "Mastercard aggregate",
+        currencyCode: "COP",
+        creditLimit: 5_000_000,
+        cutDay: 10,
+        paymentDueDay: 25,
+        openingDebt: { amount: 600_000, occurredAt: today },
+      },
+    });
+    expect(aggregate.statusCode).toBe(201);
+    expect(aggregate.json()).toMatchObject({ configured: true, debt: 600_000, creditBalance: 0 });
+
+    const listed = await app.inject({
+      method: "GET",
+      url: "/api/credit-cards?status=active",
+      headers: { cookie: userACookie },
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ configured: true, account: expect.objectContaining({ id: cardAccountId }) }),
+      expect.objectContaining({ configured: true, debt: 600_000 }),
+    ]));
+
+    const archive = await app.inject({
+      method: "DELETE",
+      url: `/api/accounts/${cardAccountId}`,
+      headers: { cookie: userACookie },
+    });
+    expect(archive.statusCode).toBe(204);
+    const archivedRead = await app.inject({
+      method: "GET",
+      url: `/api/accounts/${cardAccountId}/credit-card`,
+      headers: { cookie: userACookie },
+    });
+    expect(archivedRead.statusCode).toBe(200);
+    const archivedWrite = await app.inject({
+      method: "PUT",
+      url: `/api/accounts/${cardAccountId}/credit-card`,
+      headers: { cookie: userACookie },
+      payload: { creditLimit: 2_000_000, cutDay: 15, paymentDueDay: 30 },
+    });
+    expect(archivedWrite.statusCode).toBe(400);
+    const restore = await app.inject({
+      method: "POST",
+      url: `/api/accounts/${cardAccountId}/restore`,
+      headers: { cookie: userACookie },
+    });
+    expect(restore.statusCode).toBe(200);
   });
 
   async function signUp(email: string, name: string): Promise<string> {
@@ -193,6 +248,22 @@ describe("credit cards module", () => {
   }
 
   async function createAccount(name: string, type: "bank" | "credit_card", cookie: string) {
+    if (type === "credit_card") {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/credit-cards",
+        headers: { cookie },
+        payload: {
+          name,
+          currencyCode: "COP",
+          creditLimit: 2_000_000,
+          cutDay: 15,
+          paymentDueDay: 30,
+        },
+      });
+      expect(response.statusCode).toBe(201);
+      return response.json().account.id as string;
+    }
     const response = await app.inject({
       method: "POST",
       url: "/api/accounts",
