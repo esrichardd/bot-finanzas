@@ -24,13 +24,15 @@ Referencia de diseño del modelo de datos. **La fuente de verdad de columnas y t
 
 ### D2 — Transferencias como grupo de movimientos, no como tabla from/to
 
-**Decisión:** cada movimiento pertenece a exactamente una cuenta. Una transferencia = registro en `transfers` + N movimientos enlazados por `transfer_id`: salida en la cuenta origen, entrada en la destino, y la comisión como movimiento de gasto propio.
+**Decisión:** cada movimiento pertenece a exactamente una cuenta. Una transferencia = registro en `transfers` + N movimientos enlazados por `transfer_id`: salida en la cuenta origen, entrada en la destino, y cada comisión como movimiento de gasto propio. Las comisiones de origen pueden descontar el principal o cobrarse adicionalmente; las de destino reducen el crédito recibido. La tasa y todos los totales son derivados, nunca persistidos.
 
 **Por qué:** (a) el balance de cualquier cuenta sigue siendo `SUM(movements)` sin casos especiales; (b) en cambios de moneda se guardan **ambos montos reales** (lo que salió en COP, lo que entró en USD) — la tasa es derivada (`destino/origen`), nunca almacenada como fuente: guardar "monto + tasa" descuadra por redondeo; (c) la comisión queda como gasto de primera clase, consultable como cualquier gasto ("cuánto pagué en comisiones este año" es un query normal por categoría).
 
 **Descartado:** tabla `transfers(from_account, to_account, amount, rate, fee)`. Rompe (a) y (b).
 
 **Nota de roadmap:** esto elimina `commissions` como módulo — es una categoría + el vínculo al transfer.
+
+El endpoint técnico `/api/movements` se conserva para compatibilidad. Las interfaces humanas consumen `/api/ledger`, que agrupa las filas de cada transferencia antes de aplicar filtros y paginación; así una operación lógica nunca se parte en varias entradas, aunque sus comisiones sigan siendo gastos reales para balances y reportes.
 
 ### D3 — Cripto son monedas, no un módulo especial
 
