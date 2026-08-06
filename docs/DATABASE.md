@@ -16,7 +16,16 @@ Referencia de diseño del modelo de datos. **La fuente de verdad de columnas y t
 
 ### D1 — Una tarjeta de crédito es una cuenta, no un sistema aparte
 
-**Decisión:** `accounts.type = 'credit_card'` + tabla satélite 1:1 `credit_card_details` (cupo, día de corte, día límite de pago, cuota de manejo). La deuda es el balance negativo de la cuenta; el cupo disponible = límite + balance; pagar la tarjeta es una transferencia hacia la cuenta-tarjeta; la cuota de manejo es un gasto recurrente.
+**Decisión:** `accounts.type = 'credit_card'` + tabla satélite 1:1 `credit_card_details` (cupo, día de corte, día límite de pago, cuota de manejo). La tarjeta se abre mediante un agregado transaccional que crea cuenta, details y deuda inicial opcional como `adjustment_out`; el POST genérico de cuentas rechaza tarjetas incompletas. La deuda, saldo a favor, cupo disponible y uso son derivados del balance del ledger:
+
+```text
+debt = max(0, -balance)
+creditBalance = max(0, balance)
+availableCredit = max(0, creditLimit + balance)
+utilization = debt / creditLimit * 100
+```
+
+Pagar la tarjeta es una transferencia hacia la cuenta-tarjeta; comprar y registrar la cuota son gastos sobre la misma cuenta; avanzar efectivo es una transferencia desde ella. La cuota de manejo es metadata y no genera movimientos automáticamente. Archivar sólo se permite con balance exactamente cero, conserva details y movimientos, y restaurar conserva todo el historial.
 
 **Descartado:** módulo/tablas independientes de tarjetas. Duplicaría el concepto de movimiento y rompería la propiedad "balance = agregado de movimientos".
 
