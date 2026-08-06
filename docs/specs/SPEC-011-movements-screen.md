@@ -1,6 +1,6 @@
 # SPEC-011: Registro de ingresos, gastos y transferencias con múltiples comisiones
 
-Estado: 🔲 pendiente
+Estado: ✅ completado
 
 Ejecutar cumpliendo `ARCHITECTURE.md`, `frontend/ARCHITECTURE.md`, `docs/DATABASE.md` y los contratos terminados por SPEC-009 y SPEC-010. Todos son normativos. Este spec extiende el ledger de SPEC-004 y construye `/movements`; no reemplaza las decisiones D2/D5 ni crea una segunda fuente de verdad para balances.
 
