@@ -46,3 +46,107 @@ export function computeBalanceAdjustment(
 export function deriveRate(amountFrom: number, amountTo: number): number {
   return amountTo / amountFrom;
 }
+
+export type TransferFeeCalculationInput =
+  | {
+      side: "source";
+      mode: "deducted_from_amount" | "charged_additionally";
+      amount: number;
+      description?: string | null;
+    }
+  | {
+      side: "destination";
+      mode: "deducted_from_received";
+      amount: number;
+      description?: string | null;
+    };
+
+export interface TransferBreakdown {
+  amountFrom: number;
+  principalFrom: number;
+  grossDestination: number;
+  sourceDeductedFees: number;
+  sourceAdditionalFees: number;
+  destinationFees: number;
+  sourceTotalDebit: number;
+  destinationNetCredit: number;
+  rate: number | null;
+}
+
+export type TransferCalculationErrorCode =
+  | "TRANSFER_DESTINATION_AMOUNT_REQUIRED"
+  | "TRANSFER_SAME_CURRENCY_AMOUNT_MISMATCH"
+  | "TRANSFER_SOURCE_FEES_EXCEED_AMOUNT"
+  | "TRANSFER_DESTINATION_FEES_EXCEED_AMOUNT"
+  | "TRANSFER_AMOUNT_OVERFLOW";
+
+export class TransferCalculationError extends Error {
+  constructor(public readonly code: TransferCalculationErrorCode) {
+    super(code);
+    this.name = "TransferCalculationError";
+  }
+}
+
+function safeAdd(a: number, b: number): number {
+  const result = a + b;
+  if (!Number.isSafeInteger(result)) {
+    throw new TransferCalculationError("TRANSFER_AMOUNT_OVERFLOW");
+  }
+  return result;
+}
+
+export function computeTransferBreakdown(input: {
+  amountFrom: number;
+  amountTo?: number;
+  sameCurrency: boolean;
+  fees: ReadonlyArray<TransferFeeCalculationInput>;
+}): TransferBreakdown {
+  const sourceDeductedFees = input.fees
+    .filter((fee) => fee.side === "source" && fee.mode === "deducted_from_amount")
+    .reduce((sum, fee) => safeAdd(sum, fee.amount), 0);
+  const sourceAdditionalFees = input.fees
+    .filter((fee) => fee.side === "source" && fee.mode === "charged_additionally")
+    .reduce((sum, fee) => safeAdd(sum, fee.amount), 0);
+  const destinationFees = input.fees
+    .filter((fee) => fee.side === "destination")
+    .reduce((sum, fee) => safeAdd(sum, fee.amount), 0);
+
+  if (sourceDeductedFees >= input.amountFrom) {
+    throw new TransferCalculationError("TRANSFER_SOURCE_FEES_EXCEED_AMOUNT");
+  }
+  const principalFrom = input.amountFrom - sourceDeductedFees;
+
+  let grossDestination: number;
+  if (input.sameCurrency) {
+    if (input.amountTo !== undefined && input.amountTo !== principalFrom) {
+      throw new TransferCalculationError("TRANSFER_SAME_CURRENCY_AMOUNT_MISMATCH");
+    }
+    grossDestination = principalFrom;
+  } else {
+    if (input.amountTo === undefined) {
+      throw new TransferCalculationError("TRANSFER_DESTINATION_AMOUNT_REQUIRED");
+    }
+    grossDestination = input.amountTo;
+  }
+
+  if (destinationFees >= grossDestination) {
+    throw new TransferCalculationError("TRANSFER_DESTINATION_FEES_EXCEED_AMOUNT");
+  }
+  const sourceTotalDebit = safeAdd(
+    safeAdd(principalFrom, sourceDeductedFees),
+    sourceAdditionalFees,
+  );
+  const destinationNetCredit = grossDestination - destinationFees;
+
+  return {
+    amountFrom: input.amountFrom,
+    principalFrom,
+    grossDestination,
+    sourceDeductedFees,
+    sourceAdditionalFees,
+    destinationFees,
+    sourceTotalDebit,
+    destinationNetCredit,
+    rate: input.sameCurrency ? null : deriveRate(principalFrom, grossDestination),
+  };
+}

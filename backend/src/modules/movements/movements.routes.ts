@@ -8,6 +8,8 @@ import {
   createMovementInput,
   createTransferInput,
   listMovementsQuery,
+  ledgerQuery,
+  ledgerResponse,
   movementListResponse,
   movementResponse,
   transferResponse,
@@ -22,6 +24,8 @@ import {
   getBalances,
   listMovements,
   updateMovement,
+  listLedger,
+  previewTransfer,
 } from "./movements.service.js";
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -39,6 +43,15 @@ export async function movementsRoutes(
       schema: { querystring: listMovementsQuery, response: { 200: movementListResponse } },
     },
     async (request) => listMovements(opts.db, request.user!.id, request.query),
+  );
+
+  r.get(
+    "/ledger",
+    {
+      preHandler: opts.requireAuth,
+      schema: { querystring: ledgerQuery, response: { 200: ledgerResponse } },
+    },
+    async (request) => listLedger(opts.db, request.user!.id, request.query),
   );
 
   r.post(
@@ -109,6 +122,15 @@ export async function movementsRoutes(
       schema: { response: { 200: balanceResponse } },
     },
     async (request) => getBalances(opts.db, request.user!.id),
+  );
+
+  r.post(
+    "/transfers/preview",
+    {
+      preHandler: opts.requireAuth,
+      schema: { body: createTransferInput, response: { 200: transferResponse.shape.breakdown } },
+    },
+    async (request) => previewTransfer(opts.db, request.user!.id, request.body),
   );
 
   r.post(

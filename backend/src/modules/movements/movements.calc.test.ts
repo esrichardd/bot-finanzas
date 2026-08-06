@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeBalance,
   computeBalanceAdjustment,
+  computeTransferBreakdown,
   deriveRate,
   signedAmount,
   type MovementType,
@@ -51,5 +52,36 @@ describe("movement calculations", () => {
       amount: 75,
     });
     expect(computeBalanceAdjustment(0, 0)).toBeNull();
+  });
+
+  it("computes deducted, additional, and destination fees canonically", () => {
+    expect(computeTransferBreakdown({
+      amountFrom: 40_000,
+      sameCurrency: true,
+      fees: [
+        { side: "source", mode: "deducted_from_amount", amount: 1_500 },
+        { side: "source", mode: "charged_additionally", amount: 500 },
+        { side: "destination", mode: "deducted_from_received", amount: 1_000 },
+      ],
+    })).toMatchObject({
+      principalFrom: 38_500,
+      grossDestination: 38_500,
+      sourceDeductedFees: 1_500,
+      sourceAdditionalFees: 500,
+      destinationFees: 1_000,
+      sourceTotalDebit: 40_500,
+      destinationNetCredit: 37_500,
+      rate: null,
+    });
+  });
+
+  it("requires a destination amount for FX and rejects non-positive results", () => {
+    expect(() => computeTransferBreakdown({ amountFrom: 10, sameCurrency: false, fees: [] }))
+      .toThrow("TRANSFER_DESTINATION_AMOUNT_REQUIRED");
+    expect(() => computeTransferBreakdown({
+      amountFrom: 10,
+      sameCurrency: true,
+      fees: [{ side: "source", mode: "deducted_from_amount", amount: 10 }],
+    })).toThrow("TRANSFER_SOURCE_FEES_EXCEED_AMOUNT");
   });
 });

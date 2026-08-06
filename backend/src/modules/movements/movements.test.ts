@@ -222,11 +222,24 @@ describe("movements module", () => {
         fromAccountId: copAccountId,
         toAccountId: copDestinationId,
         amountFrom: 100_000,
-        feeAmount: 5_000,
+        fees: [
+          {
+            side: "source",
+            mode: "charged_additionally",
+            amount: 5_000,
+            description: "Comisión bancaria",
+          },
+        ],
         occurredAt: "2026-07-30",
       },
     });
     expect(sameCurrencyTransfer.statusCode).toBe(201);
+    expect(sameCurrencyTransfer.json().breakdown).toMatchObject({
+      principalFrom: 100_000,
+      sourceAdditionalFees: 5_000,
+      sourceTotalDebit: 105_000,
+      destinationNetCredit: 100_000,
+    });
     expect(sameCurrencyTransfer.json().movements).toHaveLength(3);
     const sameTransferId = sameCurrencyTransfer.json().id;
     expect(
@@ -241,6 +254,30 @@ describe("movements module", () => {
     ).toBe("00000000-0000-4000-8000-000000000010");
     expect(await balanceFor(copAccountId)).toBe(1_045_000);
     expect(await balanceFor(copDestinationId)).toBe(100_000);
+
+    const preview = await app.inject({
+      method: "POST",
+      url: "/api/transfers/preview",
+      headers: { cookie: userACookie },
+      payload: {
+        fromAccountId: copAccountId,
+        toAccountId: usdAccountId,
+        amountFrom: 400_000,
+        amountTo: 10_000,
+        fees: [
+          { side: "source", mode: "deducted_from_amount", amount: 5_000, description: "Impuesto" },
+          { side: "destination", mode: "deducted_from_received", amount: 100, description: "Recepción" },
+        ],
+        occurredAt: "2026-07-30",
+      },
+    });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.json()).toMatchObject({ principalFrom: 395_000, grossDestination: 10_000, destinationNetCredit: 9_900 });
+    expect(await database.db.query.transfers.findMany()).toHaveLength(1);
+    const ledger = await app.inject({ method: "GET", url: "/api/ledger", headers: { cookie: userACookie } });
+    expect(ledger.statusCode).toBe(200);
+    expect(ledger.json().total).toBe(4);
+    expect(ledger.json().items.filter((item: { entryKind: string }) => item.entryKind === "transfer")).toHaveLength(1);
 
     const fxTransfer = await app.inject({
       method: "POST",

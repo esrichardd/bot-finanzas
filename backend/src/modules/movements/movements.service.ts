@@ -10,6 +10,7 @@ import type { Database, DbExecutor } from "../../infra/db/client.js";
 import {
   lockOwnedAccount,
   lockOwnedActiveAccount,
+  getOwnedActiveAccount,
 } from "../accounts/accounts.service.js";
 import { getAccessibleCategory } from "../categories/categories.service.js";
 import { ownedBy, orThrow } from "../../shared/db-helpers.js";
@@ -17,9 +18,19 @@ import { ValidationError } from "../../shared/errors.js";
 import {
   computeBalance,
   computeBalanceAdjustment,
+  computeTransferBreakdown,
+  type TransferCalculationError,
   type MovementType,
 } from "./movements.calc.js";
-import { AccountAlreadyAtTargetBalanceError } from "./movements.errors.js";
+import {
+  AccountAlreadyAtTargetBalanceError,
+  TransferAmountOverflowError,
+  TransferDestinationAmountRequiredError,
+  TransferDestinationFeesExceedAmountError,
+  TransferSameAccountError,
+  TransferSameCurrencyAmountMismatchError,
+  TransferSourceFeesExceedAmountError,
+} from "./movements.errors.js";
 import { movements, transfers } from "./movements.schema.js";
 import type {
   CreateMovementInput,
@@ -27,6 +38,7 @@ import type {
   AdjustAccountBalanceInput,
   ListMovementsQuery,
   UpdateMovementInput,
+  LedgerQuery,
 } from "./movements.types.js";
 
 export const SYSTEM_FEE_CATEGORY_ID = "00000000-0000-4000-8000-000000000010";
@@ -98,6 +110,116 @@ export async function listMovements(
     .limit(query.limit)
     .offset(query.offset);
   return rows.map(toResponse);
+}
+
+type LedgerGroup = { transferId: string | null; rows: MovementRow[] };
+
+function includesText(value: string | null, query: string): boolean {
+  return (value ?? "").toLocaleLowerCase().includes(query);
+}
+
+function matchesLedgerGroup(group: LedgerGroup, query: LedgerQuery): boolean {
+  const first = group.rows[0];
+  if (!first) return false;
+  if (query.from && first.occurredAt < query.from) return false;
+  if (query.to && first.occurredAt > query.to) return false;
+
+  if (group.transferId === null) {
+    const isKind = query.kind === "all"
+      || (query.kind === "income" && first.type === "income")
+      || (query.kind === "expense" && first.type === "expense")
+      || (query.kind === "adjustment" && (first.type === "adjustment_in" || first.type === "adjustment_out"));
+    if (!isKind) return false;
+    if (query.accountId && first.accountId !== query.accountId) return false;
+    if (query.categoryId && first.categoryId !== query.categoryId) return false;
+    if (query.q && !includesText(first.description, query.q.toLocaleLowerCase())) return false;
+    return true;
+  }
+
+  if (query.kind !== "all" && query.kind !== "transfer") return false;
+  if (query.accountId && !group.rows.some((row) => row.accountId === query.accountId)) return false;
+  if (query.categoryId && !group.rows.some((row) => row.categoryId === query.categoryId)) return false;
+  if (query.q) {
+    const text = query.q.toLocaleLowerCase();
+    if (!group.rows.some((row) => includesText(row.description, text))) return false;
+  }
+  return true;
+}
+
+function toLedgerEntry(group: LedgerGroup) {
+  const first = group.rows[0]!;
+  if (group.transferId === null) {
+    return {
+      entryKind: "movement" as const,
+      id: first.id,
+      movementType: first.type as "income" | "expense" | "adjustment_in" | "adjustment_out",
+      accountId: first.accountId,
+      amount: first.amount,
+      categoryId: first.categoryId,
+      description: first.description,
+      occurredAt: first.occurredAt,
+      source: first.source,
+    };
+  }
+
+  const principal = group.rows.find((row) => row.type === "transfer_out");
+  const destination = group.rows.find((row) => row.type === "transfer_in");
+  if (!principal || !destination) return null;
+  const fees = group.rows
+    .filter((row) => row.type === "expense")
+    .map((row) => ({
+      movementId: row.id,
+      side: row.accountId === principal.accountId ? "source" as const : "destination" as const,
+      accountId: row.accountId,
+      amount: row.amount,
+      categoryId: row.categoryId,
+      description: row.description,
+    }));
+  const sourceFees = fees.filter((fee) => fee.side === "source").reduce((sum, fee) => sum + fee.amount, 0);
+  const destinationFees = fees.filter((fee) => fee.side === "destination").reduce((sum, fee) => sum + fee.amount, 0);
+  return {
+    entryKind: "transfer" as const,
+    id: group.transferId,
+    fromAccountId: principal.accountId,
+    toAccountId: destination.accountId,
+    principalFrom: principal.amount,
+    grossDestination: destination.amount,
+    sourceTotalDebit: principal.amount + sourceFees,
+    destinationNetCredit: destination.amount - destinationFees,
+    description: principal.description,
+    occurredAt: principal.occurredAt,
+    source: principal.source,
+    fees,
+  };
+}
+
+export async function listLedger(
+  db: Database,
+  userId: string,
+  query: LedgerQuery,
+) {
+  const rows = await db
+    .select()
+    .from(movements)
+    .where(ownedBy(movements.userId, userId))
+    .orderBy(desc(movements.occurredAt), desc(movements.createdAt));
+  const groups = new Map<string, LedgerGroup>();
+  for (const row of rows) {
+    const key = row.transferId ?? row.id;
+    const group = groups.get(key) ?? { transferId: row.transferId, rows: [] };
+    group.rows.push(row);
+    groups.set(key, group);
+  }
+  const items = [...groups.values()]
+    .filter((group) => matchesLedgerGroup(group, query))
+    .map(toLedgerEntry)
+    .filter((item): item is NonNullable<ReturnType<typeof toLedgerEntry>> => item !== null);
+  return {
+    items: items.slice(query.offset, query.offset + query.limit),
+    total: items.length,
+    limit: query.limit,
+    offset: query.offset,
+  };
 }
 
 export async function updateMovement(
@@ -214,13 +336,88 @@ export async function adjustAccountBalance(
   });
 }
 
+function mapTransferCalculationError(error: TransferCalculationError): never {
+  switch (error.code) {
+    case "TRANSFER_DESTINATION_AMOUNT_REQUIRED":
+      throw new TransferDestinationAmountRequiredError();
+    case "TRANSFER_SAME_CURRENCY_AMOUNT_MISMATCH":
+      throw new TransferSameCurrencyAmountMismatchError();
+    case "TRANSFER_SOURCE_FEES_EXCEED_AMOUNT":
+      throw new TransferSourceFeesExceedAmountError();
+    case "TRANSFER_DESTINATION_FEES_EXCEED_AMOUNT":
+      throw new TransferDestinationFeesExceedAmountError();
+    case "TRANSFER_AMOUNT_OVERFLOW":
+      throw new TransferAmountOverflowError();
+  }
+}
+
+type TransferAccountContext = {
+  from: Awaited<ReturnType<typeof getOwnedActiveAccount>>;
+  to: Awaited<ReturnType<typeof getOwnedActiveAccount>>;
+  sameCurrency: boolean;
+  breakdown: ReturnType<typeof computeTransferBreakdown>;
+};
+
+async function resolveTransferContext(
+  db: DbExecutor,
+  userId: string,
+  input: CreateTransferInput,
+  accounts?: {
+    from: TransferAccountContext["from"];
+    to: TransferAccountContext["to"];
+  },
+): Promise<TransferAccountContext> {
+  if (input.fromAccountId === input.toAccountId) throw new TransferSameAccountError();
+  const from = accounts?.from ?? await getOwnedActiveAccount(db, userId, input.fromAccountId);
+  const to = accounts?.to ?? await getOwnedActiveAccount(db, userId, input.toAccountId);
+  if (input.fees.length > 0) await getAccessibleCategory(db, userId, SYSTEM_FEE_CATEGORY_ID);
+  const sameCurrency = from.currencyCode === to.currencyCode;
+  let breakdown: ReturnType<typeof computeTransferBreakdown>;
+  try {
+    breakdown = computeTransferBreakdown({
+      amountFrom: input.amountFrom,
+      amountTo: input.amountTo,
+      sameCurrency,
+      fees: input.fees,
+    });
+  } catch (error) {
+    if (error instanceof Error && "code" in error) {
+      return mapTransferCalculationError(error as TransferCalculationError);
+    }
+    throw error;
+  }
+  return { from, to, sameCurrency, breakdown };
+}
+
+function breakdownResponse(context: TransferAccountContext, input: CreateTransferInput) {
+  return {
+    fromAccountId: context.from.id,
+    toAccountId: context.to.id,
+    sameCurrency: context.sameCurrency,
+    ...context.breakdown,
+    fees: input.fees.map((fee) => ({
+      side: fee.side,
+      mode: fee.mode,
+      amount: fee.amount,
+      description: fee.description ?? null,
+    })),
+  };
+}
+
+export async function previewTransfer(
+  db: Database,
+  userId: string,
+  input: CreateTransferInput,
+) {
+  const context = await resolveTransferContext(db, userId, input);
+  return breakdownResponse(context, input);
+}
+
 export async function createTransfer(
   db: Database,
   userId: string,
   input: CreateTransferInput,
 ) {
-  const feeCategoryId = input.feeCategoryId ?? SYSTEM_FEE_CATEGORY_ID;
-
   return db.transaction(async (tx) => {
     const accountIds = [input.fromAccountId, input.toAccountId].sort();
     const lockedAccounts = new Map<
@@ -235,25 +432,7 @@ export async function createTransfer(
     }
     const from = lockedAccounts.get(input.fromAccountId)!;
     const to = lockedAccounts.get(input.toAccountId)!;
-    const sameCurrency = from.currencyCode === to.currencyCode;
-    let amountTo: number;
-    if (sameCurrency) {
-      if (input.amountTo !== undefined && input.amountTo !== input.amountFrom) {
-        throw new ValidationError(
-          "Same-currency transfers must have equal amounts; model differences as fee",
-        );
-      }
-      amountTo = input.amountFrom;
-    } else {
-      if (input.amountTo === undefined) {
-        throw new ValidationError("amountTo is required for cross-currency transfers");
-      }
-      amountTo = input.amountTo;
-    }
-
-    if (input.feeAmount !== undefined) {
-      await getAccessibleCategory(tx, userId, feeCategoryId);
-    }
+    const context = await resolveTransferContext(tx, userId, input, { from, to });
 
     const [transfer] = await tx.insert(transfers).values({ userId }).returning();
     const transferId = orThrow(transfer, "transfer").id;
@@ -269,30 +448,43 @@ export async function createTransfer(
         ...base,
         accountId: from.id,
         type: "transfer_out" as const,
-        amount: input.amountFrom,
+        amount: context.breakdown.principalFrom,
         categoryId: null,
       },
+      ...input.fees
+        .filter((fee) => fee.side === "source")
+        .map((fee) => ({
+          ...base,
+          accountId: from.id,
+          type: "expense" as const,
+          amount: fee.amount,
+          categoryId: SYSTEM_FEE_CATEGORY_ID,
+          description: fee.description ?? null,
+        })),
       {
         ...base,
         accountId: to.id,
         type: "transfer_in" as const,
-        amount: amountTo,
+        amount: context.breakdown.grossDestination,
         categoryId: null,
       },
-      ...(input.feeAmount !== undefined
-        ? [
-            {
-              ...base,
-              accountId: from.id,
-              type: "expense" as const,
-              amount: input.feeAmount,
-              categoryId: feeCategoryId,
-            },
-          ]
-        : []),
+      ...input.fees
+        .filter((fee) => fee.side === "destination")
+        .map((fee) => ({
+          ...base,
+          accountId: to.id,
+          type: "expense" as const,
+          amount: fee.amount,
+          categoryId: SYSTEM_FEE_CATEGORY_ID,
+          description: fee.description ?? null,
+        })),
     ];
     const created = await tx.insert(movements).values(rows).returning();
-    return { id: transferId, movements: created.map(toResponse) };
+    return {
+      id: transferId,
+      breakdown: breakdownResponse(context, input),
+      movements: created.map(toResponse),
+    };
   });
 }
 
