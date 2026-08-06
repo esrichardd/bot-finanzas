@@ -1,6 +1,6 @@
 # SPEC-010: Gestión visual de categorías y subcategorías
 
-Estado: 🔲 pendiente
+Estado: ✅ completado — 2026-08-06
 
 Ejecutar cumpliendo `ARCHITECTURE.md`, `frontend/ARCHITECTURE.md` y la decisión **D4** de `docs/DATABASE.md`. Los tres documentos son normativos. Este spec extiende el módulo de categorías creado en SPEC-002 y construye su primera interfaz web; no crea un segundo modelo de categorías ni duplica reglas de dominio en el frontend.
 

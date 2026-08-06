@@ -44,7 +44,7 @@ Referencia de diseño del modelo de datos. **La fuente de verdad de columnas y t
 
 ### D4 — Categorías: una tabla, jerarquía de un nivel, sistema + propias
 
-**Decisión:** tabla única con `parent_id` auto-referencial (el service valida un solo nivel: un padre no puede tener padre) y `user_id` **nullable**: `NULL` = categoría del sistema (visible para todos, no editable), con valor = categoría propia del usuario. El scoping se ajusta: "mis categorías" = `user_id = :me OR user_id IS NULL`.
+**Decisión:** tabla única con `parent_id` auto-referencial (el service valida un solo nivel: un padre no puede tener padre) y `user_id` **nullable**: `NULL` = categoría del sistema (visible para todos, no editable), con valor = categoría propia del usuario. Las categorías pueden declarar `color` y `emoji` como datos presentacionales opcionales. El scoping se ajusta: "mis categorías" = `user_id = :me OR user_id IS NULL`.
 
 **Descartado:** (a) tablas separadas categories/subcategories — misma entidad, más joins; (b) sembrar copias de las predefinidas por usuario — las del sistema evolucionan una sola vez y el agente puede confiar en ids estables para clasificar.
 
@@ -96,6 +96,10 @@ erDiagram
     string user_id FK "NULL = del sistema"
     uuid parent_id FK "NULL = raiz"
     string name
+    string description "nullable"
+    string color "nullable"
+    string emoji "nullable"
+    boolean archived
   }
   MOVEMENTS {
     uuid id PK
