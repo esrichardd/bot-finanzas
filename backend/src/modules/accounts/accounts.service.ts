@@ -55,18 +55,27 @@ export async function listAccounts(
   return rows.map(toResponse);
 }
 
-/** Cuenta del usuario, activa. Lanza NotFoundError si no existe/no es suya; ValidationError si está archivada. */
-export async function getOwnedActiveAccount(
+/** Cuenta del usuario, activa o archivada. */
+export async function getOwnedAccount(
   db: DbExecutor,
   userId: string,
   accountId: string,
 ) {
-  const account = orThrow(
+  return orThrow(
     await db.query.accounts.findFirst({
       where: ownedBy(accounts.userId, userId, eq(accounts.id, accountId)),
     }),
     "account",
   );
+}
+
+/** Cuenta del usuario, activa. Lanza ValidationError si está archivada. */
+export async function getOwnedActiveAccount(
+  db: DbExecutor,
+  userId: string,
+  accountId: string,
+) {
+  const account = await getOwnedAccount(db, userId, accountId);
   if (account.archived) {
     throw new ValidationError("Account is archived");
   }

@@ -3,9 +3,19 @@ export function currentDebt(balance: number): number {
   return Math.max(0, -balance);
 }
 
-/** Cupo disponible: límite + balance. Nunca negativo. */
+/** Saldo a favor: el balance positivo de la tarjeta. */
+export function creditBalance(balance: number): number {
+  return Math.max(0, balance);
+}
+
+/** Cupo disponible. Un sobrepago puede dejarlo por encima del límite. */
 export function availableCredit(creditLimit: number, balance: number): number {
   return Math.max(0, creditLimit + balance);
+}
+
+/** Porcentaje real de utilización, sin clamping visual. */
+export function creditUtilization(debt: number, creditLimit: number): number {
+  return (debt / creditLimit) * 100;
 }
 
 /** Próxima ocurrencia de un día del mes, clampeado al último día del mes. */

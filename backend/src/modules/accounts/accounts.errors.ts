@@ -25,3 +25,13 @@ export class AccountAlreadyActiveError extends AppError {
     super("Account is already active", 400, "ACCOUNT_ALREADY_ACTIVE");
   }
 }
+
+export class CreditCardDedicatedFlowRequiredError extends AppError {
+  constructor() {
+    super(
+      "Credit cards must be created through POST /credit-cards",
+      400,
+      "CREDIT_CARD_DEDICATED_FLOW_REQUIRED",
+    );
+  }
+}

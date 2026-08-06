@@ -2,6 +2,7 @@ import type { Database } from "../../infra/db/client.js";
 import { getAccountBalance, createMovement } from "../movements/movements.service.js";
 import {
   AccountBalanceNotZeroError,
+  CreditCardDedicatedFlowRequiredError,
 } from "./accounts.errors.js";
 import {
   archiveAccount,
@@ -15,6 +16,9 @@ export async function openAccount(
   userId: string,
   input: OpenAccountInput,
 ) {
+  if (input.type === "credit_card") {
+    throw new CreditCardDedicatedFlowRequiredError();
+  }
   const { openingBalance, ...accountInput } = input;
 
   return db.transaction(async (tx) => {
