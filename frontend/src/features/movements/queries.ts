@@ -4,6 +4,16 @@ import { listAccounts, listCurrencies, type Account, type Currency } from "../..
 import { listCategories } from "../../lib/api/categories";
 import { listLedger, type MovementKind, type LedgerResponse } from "../../lib/api/movements";
 
+export type MovementCreatePrefill = {
+  mode: "expense" | "transfer";
+  accountId?: string;
+  fromAccountId?: string;
+  toAccountId?: string;
+  amountMinor?: number;
+  categoryId?: string;
+  description?: string;
+};
+
 export interface MovementsPageQuery {
   kind?: MovementKind;
   accountId?: string;
@@ -34,6 +44,35 @@ export async function getMovementsPageData(query: MovementsPageQuery = {}) {
 }
 
 export type MovementsPageData = Awaited<ReturnType<typeof getMovementsPageData>>;
+
+function uuid(value: string | string[] | undefined): string | undefined {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value) ? value : undefined;
+}
+
+export function movementPrefillFromSearchParams(
+  params: Record<string, string | string[] | undefined>,
+  data: MovementsPageData,
+): MovementCreatePrefill | undefined {
+  const create = typeof params.create === "string" ? params.create : undefined;
+  if (create !== "expense" && create !== "transfer") return undefined;
+  const amount = typeof params.amountMinor === "string" ? Number(params.amountMinor) : undefined;
+  const amountMinor = typeof amount === "number" && Number.isSafeInteger(amount) && amount > 0 ? amount : undefined;
+  const accountId = uuid(params.accountId);
+  const fromAccountId = uuid(params.fromAccountId);
+  const toAccountId = uuid(params.toAccountId);
+  const activeAccountIds = new Set(data.activeAccounts.map((account) => account.id));
+  const activeCategoryIds = new Set(data.activeCategories.map((category) => category.id));
+  const categoryId = uuid(params.categoryId);
+  return {
+    mode: create,
+    ...(accountId && activeAccountIds.has(accountId) ? { accountId } : {}),
+    ...(fromAccountId && activeAccountIds.has(fromAccountId) ? { fromAccountId } : {}),
+    ...(toAccountId && activeAccountIds.has(toAccountId) ? { toAccountId } : {}),
+    ...(amountMinor ? { amountMinor } : {}),
+    ...(categoryId && activeCategoryIds.has(categoryId) ? { categoryId } : {}),
+    ...(typeof params.description === "string" && params.description.length <= 300 ? { description: params.description } : {}),
+  };
+}
 
 export function accountCurrency(account: Account, currencies: Currency[]) {
   const currency = currencies.find((item) => item.code === account.currencyCode);

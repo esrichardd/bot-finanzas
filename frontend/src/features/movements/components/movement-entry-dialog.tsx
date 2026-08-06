@@ -11,7 +11,8 @@ import { Select } from "../../../components/ui/select";
 import { Textarea } from "../../../components/ui/textarea";
 import type { Account, Currency } from "../../../lib/api/accounts";
 import type { Category } from "../../../lib/api/categories";
-import { formatMoney } from "../../../lib/money";
+import { formatMoney, formatMoneyInput } from "../../../lib/money";
+import type { MovementCreatePrefill } from "../queries";
 import { createMovementAction, createTransferAction, previewTransferAction } from "../actions";
 import { initialMovementActionState, type MovementActionState } from "../action-state";
 
@@ -42,6 +43,7 @@ export function MovementEntryDialog({
   activeAccounts,
   activeCategories,
   currencies,
+  initialPrefill,
   onOpenChange,
   onSuccess,
   open,
@@ -50,6 +52,7 @@ export function MovementEntryDialog({
   activeAccounts: Account[];
   activeCategories: Category[];
   currencies: Currency[];
+  initialPrefill?: MovementCreatePrefill;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   open: boolean;
@@ -63,6 +66,14 @@ export function MovementEntryDialog({
   const [createState, createAction, createPending] = useActionState(createTransferAction, initialMovementActionState);
   const [fromAccountId, setFromAccountId] = useState(activeAccounts[0]?.id ?? "");
   const [toAccountId, setToAccountId] = useState(activeAccounts[1]?.id ?? activeAccounts[0]?.id ?? "");
+  const [movementAccountId, setMovementAccountId] = useState(activeAccounts[0]?.id ?? "");
+  const [movementType, setMovementType] = useState<"income" | "expense">("expense");
+  const [movementAmount, setMovementAmount] = useState("");
+  const [movementCategoryId, setMovementCategoryId] = useState("");
+  const [movementDescription, setMovementDescription] = useState("");
+  const [transferAmountFrom, setTransferAmountFrom] = useState("");
+  const [transferAmountTo, setTransferAmountTo] = useState("");
+  const [transferDescription, setTransferDescription] = useState("");
   const fromAccount = accounts.find((account) => account.id === fromAccountId);
   const toAccount = accounts.find((account) => account.id === toAccountId);
   const fromCurrency = currencies.find((currency) => currency.code === fromAccount?.currencyCode);
@@ -71,6 +82,40 @@ export function MovementEntryDialog({
   const preview = previewState.status === "preview" ? previewState.preview : null;
   const accountOptions = activeAccounts.length > 0 ? activeAccounts : accounts.filter((account) => !account.archived);
   const feeJson = JSON.stringify(fees);
+
+  /* eslint-disable react-hooks/set-state-in-effect -- URL suggestions initialize the interactive form once. */
+  useEffect(() => {
+    if (!open || !initialPrefill) return;
+    if (initialPrefill.mode === "expense") {
+      const accountId = initialPrefill.accountId && activeAccounts.some((account) => account.id === initialPrefill.accountId)
+        ? initialPrefill.accountId
+        : activeAccounts[0]?.id ?? "";
+      setMode("movement");
+      setMovementAccountId(accountId);
+      setMovementType("expense");
+      setMovementCategoryId(initialPrefill.categoryId ?? "");
+      setMovementDescription(initialPrefill.description ?? "");
+      const account = accounts.find((item) => item.id === accountId);
+      const currency = currencies.find((item) => item.code === account?.currencyCode);
+      setMovementAmount(initialPrefill.amountMinor && currency ? formatMoneyInput(initialPrefill.amountMinor, currency, locale) : "");
+    } else {
+      const from = initialPrefill.fromAccountId && activeAccounts.some((account) => account.id === initialPrefill.fromAccountId)
+        ? initialPrefill.fromAccountId
+        : activeAccounts.find((account) => account.id !== initialPrefill.toAccountId)?.id ?? activeAccounts[0]?.id ?? "";
+      const to = initialPrefill.toAccountId && activeAccounts.some((account) => account.id === initialPrefill.toAccountId)
+        ? initialPrefill.toAccountId
+        : activeAccounts.find((account) => account.id !== from)?.id ?? activeAccounts[0]?.id ?? "";
+      setMode("transfer");
+      setFromAccountId(from);
+      setToAccountId(to);
+      const account = accounts.find((item) => item.id === from);
+      const currency = currencies.find((item) => item.code === account?.currencyCode);
+      setTransferAmountFrom(initialPrefill.amountMinor && currency ? formatMoneyInput(initialPrefill.amountMinor, currency, locale) : "");
+      setTransferAmountTo("");
+      setTransferDescription(initialPrefill.description ?? "");
+    }
+  }, [accounts, activeAccounts, currencies, initialPrefill, locale, open]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (movementState.status === "success" || createState.status === "success") {
@@ -104,24 +149,24 @@ export function MovementEntryDialog({
 
       {mode === "movement" ? <form action={movementAction} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2"><Label htmlFor="movement-account">{t("account")}</Label><Select id="movement-account" name="accountId" required>{accountOptions.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currencyCode}</option>)}</Select></div>
-          <div className="space-y-2"><Label htmlFor="movement-type">{t("type")}</Label><Select id="movement-type" name="type" defaultValue="expense"><option value="expense">{t("expense")}</option><option value="income">{t("income")}</option></Select></div>
+          <div className="space-y-2"><Label htmlFor="movement-account">{t("account")}</Label><Select id="movement-account" name="accountId" onChange={(event) => setMovementAccountId(event.target.value)} value={movementAccountId} required>{accountOptions.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currencyCode}</option>)}</Select></div>
+          <div className="space-y-2"><Label htmlFor="movement-type">{t("type")}</Label><Select id="movement-type" name="type" onChange={(event) => setMovementType(event.target.value as "income" | "expense")} value={movementType}><option value="expense">{t("expense")}</option><option value="income">{t("income")}</option></Select></div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2"><Label htmlFor="movement-amount">{t("amount")}</Label><Input id="movement-amount" name="amount" inputMode="decimal" placeholder="0" required /></div>
+          <div className="space-y-2"><Label htmlFor="movement-amount">{t("amount")}</Label><Input id="movement-amount" name="amount" onChange={(event) => setMovementAmount(event.target.value)} value={movementAmount} inputMode="decimal" placeholder="0" required /></div>
           <div className="space-y-2"><Label htmlFor="movement-date">{t("date")}</Label><Input id="movement-date" name="occurredAt" type="date" defaultValue={today()} required /></div>
         </div>
-        <div className="space-y-2"><Label htmlFor="movement-category">{t("category")}</Label><Select id="movement-category" name="categoryId"><CategoryOptions categories={activeCategories} noneLabel={t("noCategory")} /></Select></div>
-        <div className="space-y-2"><Label htmlFor="movement-description">{t("description")}</Label><Textarea id="movement-description" name="description" maxLength={300} placeholder={t("descriptionPlaceholder")} /></div>
+        <div className="space-y-2"><Label htmlFor="movement-category">{t("category")}</Label><Select id="movement-category" name="categoryId" onChange={(event) => setMovementCategoryId(event.target.value)} value={movementCategoryId}><CategoryOptions categories={activeCategories} noneLabel={t("noCategory")} /></Select></div>
+        <div className="space-y-2"><Label htmlFor="movement-description">{t("description")}</Label><Textarea id="movement-description" name="description" maxLength={300} onChange={(event) => setMovementDescription(event.target.value)} placeholder={t("descriptionPlaceholder")} value={movementDescription} /></div>
         <ErrorMessage state={movementState} t={t} />
         <DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t("cancel")}</Button><Button disabled={movementPending} type="submit">{movementPending ? t("saving") : t("save")}</Button></DialogFooter>
       </form> : <div className="space-y-5">
         <form action={previewAction} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="transfer-from">{t("fromAccount")}</Label><Select id="transfer-from" name="fromAccountId" value={fromAccountId} onChange={(event) => setFromAccountId(event.target.value)} required>{accountOptions.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currencyCode}</option>)}</Select></div><div className="space-y-2"><Label htmlFor="transfer-to">{t("toAccount")}</Label><Select id="transfer-to" name="toAccountId" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)} required>{accountOptions.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currencyCode}</option>)}</Select></div></div>
-          <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="transfer-amount-from">{t("amountFrom")} {fromCurrency ? `(${fromCurrency.code})` : ""}</Label><Input id="transfer-amount-from" name="amountFrom" inputMode="decimal" placeholder="0" required /></div>{fx ? <div className="space-y-2"><Label htmlFor="transfer-amount-to">{t("amountTo")} {toCurrency ? `(${toCurrency.code})` : ""}</Label><Input id="transfer-amount-to" name="amountTo" inputMode="decimal" placeholder="0" required /></div> : <input name="amountTo" type="hidden" value="" />}</div>
+          <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="transfer-amount-from">{t("amountFrom")} {fromCurrency ? `(${fromCurrency.code})` : ""}</Label><Input id="transfer-amount-from" name="amountFrom" onChange={(event) => setTransferAmountFrom(event.target.value)} value={transferAmountFrom} inputMode="decimal" placeholder="0" required /></div>{fx ? <div className="space-y-2"><Label htmlFor="transfer-amount-to">{t("amountTo")} {toCurrency ? `(${toCurrency.code})` : ""}</Label><Input id="transfer-amount-to" name="amountTo" onChange={(event) => setTransferAmountTo(event.target.value)} value={transferAmountTo} inputMode="decimal" placeholder="0" required /></div> : <input name="amountTo" type="hidden" value="" />}</div>
           <div className="rounded-xl border bg-muted/30 p-4"><div className="mb-3 flex items-center justify-between gap-3"><div><h3 className="font-medium">{t("sourceFees")}</h3><p className="text-xs text-muted-foreground">{t("feesHint")}</p></div><Button type="button" variant="outline" size="sm" onClick={() => addFee("source")} disabled={fees.length >= 10}>{t("addFee")}</Button></div>{sourceFees.length === 0 ? <p className="text-sm text-muted-foreground">{t("noFees")}</p> : <div className="space-y-3">{sourceFees.map((fee) => { const index = feeFieldIndex(fee); return <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]" key={index}><Input aria-label={t("feeAmount")} value={fee.amount} onChange={(event) => updateFee(index, "amount", event.target.value)} placeholder="0" inputMode="decimal" /><div className="flex gap-2"><Select aria-label={t("feeMode")} value={fee.mode} onChange={(event) => updateFee(index, "mode", event.target.value)}><option value="deducted_from_amount">{t("deducted")}</option><option value="charged_additionally">{t("additional")}</option></Select><Input aria-label={t("feeDescription")} value={fee.description} onChange={(event) => updateFee(index, "description", event.target.value)} placeholder={t("feeDescription")} /></div><Button type="button" variant="ghost" onClick={() => removeFee(index)} aria-label={t("removeFee")}>×</Button></div>; })}</div>}</div>
           <div className="rounded-xl border bg-muted/30 p-4"><div className="mb-3 flex items-center justify-between gap-3"><div><h3 className="font-medium">{t("destinationFees")}</h3><p className="text-xs text-muted-foreground">{t("destinationFeesHint")}</p></div><Button type="button" variant="outline" size="sm" onClick={() => addFee("destination")} disabled={fees.length >= 10}>{t("addFee")}</Button></div>{destinationFees.length === 0 ? <p className="text-sm text-muted-foreground">{t("noFees")}</p> : <div className="space-y-3">{destinationFees.map((fee) => { const index = feeFieldIndex(fee); return <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]" key={index}><Input aria-label={t("feeAmount")} value={fee.amount} onChange={(event) => updateFee(index, "amount", event.target.value)} placeholder="0" inputMode="decimal" /><Input aria-label={t("feeDescription")} value={fee.description} onChange={(event) => updateFee(index, "description", event.target.value)} placeholder={t("feeDescription")} /><Button type="button" variant="ghost" onClick={() => removeFee(index)} aria-label={t("removeFee")}>×</Button></div>; })}</div>}</div>
-          <input name="fees" type="hidden" value={feeJson} /><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="transfer-date">{t("date")}</Label><Input id="transfer-date" name="occurredAt" type="date" defaultValue={today()} required /></div><div className="space-y-2"><Label htmlFor="transfer-description">{t("description")}</Label><Input id="transfer-description" name="description" maxLength={300} /></div></div>
+          <input name="fees" type="hidden" value={feeJson} /><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="transfer-date">{t("date")}</Label><Input id="transfer-date" name="occurredAt" type="date" defaultValue={today()} required /></div><div className="space-y-2"><Label htmlFor="transfer-description">{t("description")}</Label><Input id="transfer-description" name="description" maxLength={300} onChange={(event) => setTransferDescription(event.target.value)} value={transferDescription} /></div></div>
           <ErrorMessage state={previewState} t={t} />
           <DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t("cancel")}</Button><Button disabled={previewPending} type="submit">{previewPending ? t("previewing") : t("preview")}</Button></DialogFooter>
         </form>
