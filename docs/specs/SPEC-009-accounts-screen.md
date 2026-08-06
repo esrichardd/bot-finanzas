@@ -1,6 +1,6 @@
 # SPEC-009: Pantalla de cuentas y saldo inicial transaccional
 
-Estado: 🔲 pendiente
+Estado: ✅ completado — 2026-08-06
 
 Ejecutar cumpliendo `ARCHITECTURE.md` y `frontend/ARCHITECTURE.md`. Ambos documentos son normativos. Este spec toca backend y frontend porque el saldo inicial debe crearse de forma atómica con la cuenta: no se permite resolver esa garantía con dos escrituras independientes desde el navegador ni desde una Server Action.
 
