@@ -17,6 +17,19 @@ export function formatMoney(
   return `${formatted} ${currency.code}`;
 }
 
+/** Unidades mínimas → valor editable sin símbolo ni código de moneda. */
+export function formatMoneyInput(
+  amountMinor: number,
+  currency: CurrencyInfo,
+  locale: string,
+): string {
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: currency.decimals,
+    maximumFractionDigits: currency.decimals,
+    useGrouping: false,
+  }).format(amountMinor / 10 ** currency.decimals);
+}
+
 /**
  * Input humano → unidades mínimas (entero). Acepta "1.234,56" y "1,234.56".
  * Devuelve null si no es parseable o resulta negativo.
