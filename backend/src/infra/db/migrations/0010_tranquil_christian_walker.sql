@@ -1,0 +1,15 @@
+ALTER TABLE "categories" ADD COLUMN "emoji" text;
+UPDATE "categories" SET "emoji" = '🛒' WHERE "id" = '00000000-0000-4000-8000-000000000001';
+UPDATE "categories" SET "emoji" = '🍽️' WHERE "id" = '00000000-0000-4000-8000-000000000002';
+UPDATE "categories" SET "emoji" = '🚗' WHERE "id" = '00000000-0000-4000-8000-000000000003';
+UPDATE "categories" SET "emoji" = '🏠' WHERE "id" = '00000000-0000-4000-8000-000000000004';
+UPDATE "categories" SET "emoji" = '💡' WHERE "id" = '00000000-0000-4000-8000-000000000005';
+UPDATE "categories" SET "emoji" = '❤️‍🩹' WHERE "id" = '00000000-0000-4000-8000-000000000006';
+UPDATE "categories" SET "emoji" = '🎬' WHERE "id" = '00000000-0000-4000-8000-000000000007';
+UPDATE "categories" SET "emoji" = '🎓' WHERE "id" = '00000000-0000-4000-8000-000000000008';
+UPDATE "categories" SET "emoji" = '✈️' WHERE "id" = '00000000-0000-4000-8000-000000000009';
+UPDATE "categories" SET "emoji" = '🧾' WHERE "id" = '00000000-0000-4000-8000-000000000010';
+UPDATE "categories" SET "emoji" = '🏛️' WHERE "id" = '00000000-0000-4000-8000-000000000011';
+UPDATE "categories" SET "emoji" = '📦' WHERE "id" = '00000000-0000-4000-8000-000000000012';
+UPDATE "categories" SET "emoji" = '💰' WHERE "id" = '00000000-0000-4000-8000-000000000013';
+UPDATE "categories" SET "emoji" = '💵' WHERE "id" = '00000000-0000-4000-8000-000000000014';

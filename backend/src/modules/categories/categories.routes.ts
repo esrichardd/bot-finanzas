@@ -6,12 +6,14 @@ import {
   categoryListResponse,
   categoryResponse,
   createCategoryInput,
+  listCategoriesQuery,
   updateCategoryInput,
 } from "./categories.types.js";
 import {
   archiveCategory,
   createCategory,
   listCategories,
+  restoreCategory,
   updateCategory,
 } from "./categories.service.js";
 
@@ -27,9 +29,12 @@ export async function categoriesRoutes(
     "/categories",
     {
       preHandler: opts.requireAuth,
-      schema: { response: { 200: categoryListResponse } },
+      schema: {
+        querystring: listCategoriesQuery,
+        response: { 200: categoryListResponse },
+      },
     },
-    async (request) => listCategories(opts.db, request.user!.id),
+    async (request) => listCategories(opts.db, request.user!.id, request.query),
   );
 
   r.post(
@@ -81,5 +86,18 @@ export async function categoriesRoutes(
       await archiveCategory(opts.db, request.user!.id, request.params.id);
       return reply.code(204).send(null);
     },
+  );
+
+  r.post(
+    "/categories/:id/restore",
+    {
+      preHandler: opts.requireAuth,
+      schema: {
+        params: idParam,
+        response: { 200: categoryResponse },
+      },
+    },
+    async (request) =>
+      restoreCategory(opts.db, request.user!.id, request.params.id),
   );
 }

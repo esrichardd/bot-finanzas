@@ -71,6 +71,13 @@
       "when": 1785712010611,
       "tag": "0009_enforce-active-account-name",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786047858715,
+      "tag": "0010_tranquil_christian_walker",
+      "breakpoints": true
     }
   ]
 }

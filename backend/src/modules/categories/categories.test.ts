@@ -85,6 +85,22 @@ describe("categories module", () => {
     expect(initialCategories.every((category: { isSystem: boolean }) => category.isSystem)).toBe(
       true,
     );
+    expect(initialCategories.every((category: { emoji: string | null }) => category.emoji)).toBe(true);
+
+    const archivedInitially = await app.inject({
+      method: "GET",
+      url: "/api/categories?status=archived",
+      headers: { cookie: userACookie },
+    });
+    expect(archivedInitially.statusCode).toBe(200);
+    expect(archivedInitially.json()).toEqual([]);
+
+    const invalidStatus = await app.inject({
+      method: "GET",
+      url: "/api/categories?status=unknown",
+      headers: { cookie: userACookie },
+    });
+    expect(invalidStatus.statusCode).toBe(400);
 
     const create = await app.inject({
       method: "POST",
@@ -93,6 +109,7 @@ describe("categories module", () => {
       payload: {
         name: "Gimnasio",
         color: "#1D9E75",
+        emoji: "❤️‍🩹",
         description: "Salud y entrenamiento",
       },
     });
@@ -100,6 +117,7 @@ describe("categories module", () => {
     expect(create.json()).toMatchObject({
       name: "Gimnasio",
       color: "#1D9E75",
+      emoji: "❤️‍🩹",
       description: "Salud y entrenamiento",
       isSystem: false,
       parentId: null,
@@ -113,6 +131,16 @@ describe("categories module", () => {
       payload: { name: "Color inválido", color: "verde" },
     });
     expect(invalidColor.statusCode).toBe(400);
+
+    for (const emoji of ["texto", "🚗🚗", ""]) {
+      const invalidEmoji = await app.inject({
+        method: "POST",
+        url: "/api/categories",
+        headers: { cookie: userACookie },
+        payload: { name: `Emoji inválido ${emoji || "vacío"}`, emoji },
+      });
+      expect(invalidEmoji.statusCode).toBe(400);
+    }
 
     const userBList = await app.inject({
       method: "GET",
@@ -137,12 +165,14 @@ describe("categories module", () => {
       method: "POST",
       url: "/api/categories",
       headers: { cookie: userACookie },
-      payload: { name: "Suplementos", parentId: userACategoryId },
+      payload: { name: "Suplementos", parentId: userACategoryId, emoji: null, color: null },
     });
     expect(subcategory.statusCode).toBe(201);
     expect(subcategory.json()).toMatchObject({
       name: "Suplementos",
       parentId: userACategoryId,
+      emoji: null,
+      color: null,
     });
     userASubcategoryId = subcategory.json().id;
 
@@ -153,6 +183,21 @@ describe("categories module", () => {
       payload: { name: "Proteína", parentId: userASubcategoryId },
     });
     expect(thirdLevel.statusCode).toBe(400);
+
+    const systemChild = await app.inject({
+      method: "POST",
+      url: "/api/categories",
+      headers: { cookie: userACookie },
+      payload: {
+        name: "Gasolina de prueba",
+        parentId: "00000000-0000-4000-8000-000000000003",
+      },
+    });
+    expect(systemChild.statusCode).toBe(201);
+    expect(systemChild.json()).toMatchObject({
+      parentId: "00000000-0000-4000-8000-000000000003",
+      isSystem: false,
+    });
 
     const systemUpdate = await app.inject({
       method: "PATCH",
@@ -169,6 +214,13 @@ describe("categories module", () => {
     });
     expect(systemArchive.statusCode).toBe(404);
 
+    const systemRestore = await app.inject({
+      method: "POST",
+      url: `/api/categories/${SYSTEM_CATEGORY_ID}/restore`,
+      headers: { cookie: userACookie },
+    });
+    expect(systemRestore.statusCode).toBe(404);
+
     const duplicate = await app.inject({
       method: "POST",
       url: "/api/categories",
@@ -176,6 +228,48 @@ describe("categories module", () => {
       payload: { name: "Gimnasio" },
     });
     expect(duplicate.statusCode).toBe(400);
+    expect(duplicate.json().error).toBe("CATEGORY_NAME_CONFLICT");
+
+    const duplicateChild = await app.inject({
+      method: "POST",
+      url: "/api/categories",
+      headers: { cookie: userACookie },
+      payload: { name: "Suplementos", parentId: userACategoryId },
+    });
+    expect(duplicateChild.statusCode).toBe(400);
+    expect(duplicateChild.json().error).toBe("CATEGORY_NAME_CONFLICT");
+
+    const secondRoot = await app.inject({
+      method: "POST",
+      url: "/api/categories",
+      headers: { cookie: userACookie },
+      payload: { name: "Otra raíz", emoji: "🐾", color: "#D4537E" },
+    });
+    expect(secondRoot.statusCode).toBe(201);
+    const secondRootId = secondRoot.json().id as string;
+    const sameChildNameElsewhere = await app.inject({
+      method: "POST",
+      url: "/api/categories",
+      headers: { cookie: userACookie },
+      payload: { name: "Suplementos", parentId: secondRootId },
+    });
+    expect(sameChildNameElsewhere.statusCode).toBe(201);
+
+    const sameNameUpdate = await app.inject({
+      method: "PATCH",
+      url: `/api/categories/${userACategoryId}`,
+      headers: { cookie: userACookie },
+      payload: { name: "Gimnasio" },
+    });
+    expect(sameNameUpdate.statusCode).toBe(200);
+    const conflictingUpdate = await app.inject({
+      method: "PATCH",
+      url: `/api/categories/${userACategoryId}`,
+      headers: { cookie: userACookie },
+      payload: { name: "Otra raíz" },
+    });
+    expect(conflictingUpdate.statusCode).toBe(400);
+    expect(conflictingUpdate.json().error).toBe("CATEGORY_NAME_CONFLICT");
 
     const archive = await app.inject({
       method: "DELETE",
@@ -196,6 +290,91 @@ describe("categories module", () => {
     expect(
       afterArchive.json().some((category: { id: string }) => category.id === userASubcategoryId),
     ).toBe(false);
+
+    const archivedList = await app.inject({
+      method: "GET",
+      url: "/api/categories?status=archived",
+      headers: { cookie: userACookie },
+    });
+    expect(archivedList.statusCode).toBe(200);
+    expect(archivedList.json().map((category: { id: string }) => category.id)).toEqual(
+      expect.arrayContaining([userACategoryId, userASubcategoryId]),
+    );
+
+    const archiveAgain = await app.inject({
+      method: "DELETE",
+      url: `/api/categories/${userACategoryId}`,
+      headers: { cookie: userACookie },
+    });
+    expect(archiveAgain.statusCode).toBe(400);
+    expect(archiveAgain.json().error).toBe("CATEGORY_ALREADY_ARCHIVED");
+
+    const childRestoreWhileParentArchived = await app.inject({
+      method: "POST",
+      url: `/api/categories/${userASubcategoryId}/restore`,
+      headers: { cookie: userACookie },
+    });
+    expect(childRestoreWhileParentArchived.statusCode).toBe(400);
+    expect(childRestoreWhileParentArchived.json().error).toBe("CATEGORY_PARENT_ARCHIVED");
+
+    const restoreConflict = await app.inject({
+      method: "POST",
+      url: "/api/categories",
+      headers: { cookie: userACookie },
+      payload: { name: "Gimnasio", emoji: "🏷️" },
+    });
+    expect(restoreConflict.statusCode).toBe(201);
+    const restoreConflictId = restoreConflict.json().id as string;
+
+    const rootRestore = await app.inject({
+      method: "POST",
+      url: `/api/categories/${userACategoryId}/restore`,
+      headers: { cookie: userACookie },
+    });
+    expect(rootRestore.statusCode).toBe(400);
+    expect(rootRestore.json().error).toBe("CATEGORY_NAME_CONFLICT");
+    const archivedAfterConflict = await app.inject({
+      method: "GET",
+      url: "/api/categories?status=archived",
+      headers: { cookie: userACookie },
+    });
+    expect(archivedAfterConflict.json().some((category: { id: string }) => category.id === userASubcategoryId)).toBe(true);
+
+    const removeRestoreConflict = await app.inject({
+      method: "DELETE",
+      url: `/api/categories/${restoreConflictId}`,
+      headers: { cookie: userACookie },
+    });
+    expect(removeRestoreConflict.statusCode).toBe(204);
+
+    const restoredRoot = await app.inject({
+      method: "POST",
+      url: `/api/categories/${userACategoryId}/restore`,
+      headers: { cookie: userACookie },
+    });
+    expect(restoredRoot.statusCode).toBe(200);
+    expect(restoredRoot.json()).toMatchObject({ id: userACategoryId, archived: false });
+    const restoredActive = await app.inject({
+      method: "GET",
+      url: "/api/categories",
+      headers: { cookie: userACookie },
+    });
+    expect(restoredActive.json().some((category: { id: string }) => category.id === userASubcategoryId)).toBe(true);
+
+    const restoreAgain = await app.inject({
+      method: "POST",
+      url: `/api/categories/${userACategoryId}/restore`,
+      headers: { cookie: userACookie },
+    });
+    expect(restoreAgain.statusCode).toBe(400);
+    expect(restoreAgain.json().error).toBe("CATEGORY_ALREADY_ACTIVE");
+
+    const archiveAfterRestore = await app.inject({
+      method: "DELETE",
+      url: `/api/categories/${userACategoryId}`,
+      headers: { cookie: userACookie },
+    });
+    expect(archiveAfterRestore.statusCode).toBe(204);
 
     const activeCategory = await app.inject({
       method: "POST",

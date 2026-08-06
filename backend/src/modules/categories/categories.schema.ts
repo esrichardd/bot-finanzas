@@ -18,6 +18,8 @@ export const categories = pgTable("categories", {
   description: text("description"),
   // Hex "#RRGGBB". La validación de formato vive en Zod (borde), no en la DB.
   color: text("color"),
+  // Un grapheme emoji Unicode. La validación de formato vive en Zod (borde).
+  emoji: text("emoji"),
   archived: boolean("archived").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
