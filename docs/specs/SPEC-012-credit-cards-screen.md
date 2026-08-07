@@ -1,6 +1,6 @@
 # SPEC-012: Gestión integral de tarjetas de crédito
 
-Estado: 🔲 pendiente
+Estado: ✅ completado — 2026-08-06
 
 Ejecutar cumpliendo `ARCHITECTURE.md`, `frontend/ARCHITECTURE.md`, `docs/DATABASE.md` —en especial D1— y los contratos completados por SPEC-009, SPEC-010 y SPEC-011. Todos son normativos. Este spec amplía el módulo `credit-cards` de SPEC-005 y construye `/credit-cards`; una tarjeta continúa siendo una cuenta del ledger, no un sistema contable paralelo.
 
