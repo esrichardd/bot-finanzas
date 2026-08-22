@@ -52,11 +52,17 @@ En producción:
 - Cloudflare usa proxy para `finanzas.esrichard.dev` y cifrado `Full (strict)`.
 - Los registros raíz y `www` de Vercel permanecen en modo `DNS only`.
 - Hay un respaldo lógico local diario de PostgreSQL con retención de 14 días.
+- Cada respaldo se cifra en la VPS y se copia a Cloudflare R2 con retención de
+  30 días.
 
 ### Trabajo operativo pendiente
 
-- Copiar cada respaldo a almacenamiento externo S3-compatible.
-- Probar una restauración completa y repetir el simulacro trimestralmente.
+- Automatizar el despliegue al hacer `push` a `main` mediante GitHub Actions,
+  usando una llave SSH exclusiva y restringida para CI/CD.
+- Repetir trimestralmente el simulacro de restauración; el próximo vence el
+  2026-11-22.
+- Migrar el backup desde el timer del host al sidecar definido en
+  `ARCHITECTURE.md`, conservando R2 y el mismo procedimiento de validación.
 - Añadir heartbeat para detectar respaldos que dejan de ejecutarse.
 - Habilitar access logs de Caddy preservando la IP real enviada por Cloudflare.
 - Restringir el acceso directo al origen o migrar a Cloudflare Tunnel.
@@ -65,8 +71,8 @@ En producción:
 - Configurar acceso visual a PostgreSQL con un usuario de solo lectura.
 
 El backup externo y el restore trimestral son requisitos de
-`ARCHITECTURE.md`. El respaldo local actual es una etapa intermedia y no
-satisface por sí solo ese requisito.
+`ARCHITECTURE.md`. La copia externa y el primer restore ya están implementados;
+queda pendiente alinear la automatización con el sidecar especificado allí.
 
 ## 2. Variables usadas en esta guía
 
@@ -83,6 +89,7 @@ valores literales:
 | `<AUTH_SECRET>`          | Secreto aleatorio de Better Auth                             |
 | `<POSTGRES_PASSWORD>`    | Contraseña aleatoria de PostgreSQL                           |
 | `<VERCEL_CNAME_TARGET>`  | CNAME específico mostrado por Vercel                         |
+| `<R2_BUCKET_NAME>`       | Nombre del bucket privado usado para backups externos        |
 
 Nunca pegar secretos en tickets, documentación, commits, capturas ni mensajes.
 
@@ -389,12 +396,42 @@ Servicios válidos actualmente: `postgres`, `backend`, `frontend` y `caddy`.
 - Formato: archivo custom de `pg_dump` (`-Fc`), comprimido por PostgreSQL.
 - Frecuencia: diaria a las 03:15, hora de Bogotá.
 - Retención local: 14 días.
+- Retención externa: 30 días en Cloudflare R2 Standard.
 - Directorio: `/home/opc/backups/postgres`.
 - Automatización: `systemd` timer.
 - Usuario de ejecución: `opc`, con grupo suplementario `docker`.
+- Remoto R2 base: `r2`.
+- Remoto con cifrado del lado del cliente: `r2-finanzas`.
 
 El formato custom se valida con `pg_restore --list` antes de considerar exitosa
-la copia.
+la copia local. La copia externa se valida con `rclone cryptcheck`.
+
+### Almacenamiento externo en Cloudflare R2
+
+El bucket privado utiliza la clase Standard y una ubicación sugerida en Eastern
+North America, próxima a la VPS de Ashburn. No tiene dominio público ni acceso
+mediante `r2.dev`.
+
+Configuración del bucket:
+
+- Una regla lifecycle elimina objetos después de 30 días.
+- La regla predeterminada aborta cargas multipart incompletas después de 7 días.
+- Un bucket lock impide borrar o sobrescribir objetos durante 30 días.
+- El token de la VPS tiene `Object Read & Write` únicamente sobre este bucket.
+
+`rclone` está instalado desde `ol9_developer_EPEL`. Su configuración privada se
+encuentra en `/home/opc/.config/rclone/rclone.conf`, con permisos `600`. El
+remoto cifrado apunta a:
+
+```text
+r2:<R2_BUCKET_NAME>/encrypted
+```
+
+El contenido, los nombres de archivos y los nombres de directorios se cifran
+antes de salir de la VPS. La contraseña y el salt de `rclone crypt`, así como
+las credenciales R2, deben conservarse fuera de la VPS en un gestor de
+contraseñas. Sin la contraseña y el salt no es posible recuperar los objetos
+cifrados después de perder el servidor.
 
 ### Prueba manual
 
@@ -421,8 +458,11 @@ set -Eeuo pipefail
 readonly PROJECT_DIR="/home/opc/finanzas"
 readonly BACKUP_DIR="/home/opc/backups/postgres"
 readonly COMPOSE_FILE="${PROJECT_DIR}/docker-compose.prod.yml"
+readonly RCLONE_CONFIG="/home/opc/.config/rclone/rclone.conf"
+readonly RCLONE_REMOTE="r2-finanzas:"
 readonly TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-readonly BACKUP_FILE="${BACKUP_DIR}/finanzas-${TIMESTAMP}.dump"
+readonly BACKUP_NAME="finanzas-${TIMESTAMP}.dump"
+readonly BACKUP_FILE="${BACKUP_DIR}/${BACKUP_NAME}"
 
 umask 077
 mkdir -p "$BACKUP_DIR"
@@ -439,13 +479,23 @@ docker compose -f "$COMPOSE_FILE" exec -T postgres \
 
 trap - ERR
 
+/usr/bin/rclone \
+  --config "$RCLONE_CONFIG" \
+  copyto "$BACKUP_FILE" "${RCLONE_REMOTE}${BACKUP_NAME}"
+
+/usr/bin/rclone \
+  --config "$RCLONE_CONFIG" \
+  cryptcheck "$BACKUP_DIR" "$RCLONE_REMOTE" \
+  --include "$BACKUP_NAME" \
+  --one-way
+
 find "$BACKUP_DIR" \
   -type f \
   -name 'finanzas-*.dump' \
   -mtime +13 \
   -delete
 
-printf 'Backup completed: %s\n' "$BACKUP_FILE"
+printf 'Local and off-site backup completed: %s\n' "$BACKUP_FILE"
 ```
 
 El script tiene permisos `700`.
@@ -514,9 +564,44 @@ seguro es crear una base temporal, restaurar allí y verificar conteos y
 funcionalidad. La restauración usa `pg_restore` porque los dumps son formato
 custom.
 
-El simulacro completo todavía está pendiente. Cuando se implemente, este
-documento debe incluir los comandos exactos, resultado y fecha de la última
-prueba.
+Seleccionar un objeto visible mediante `rclone lsl r2-finanzas:` y asignar
+nombres exclusivos para el simulacro:
+
+```bash
+restore_file="finanzas-YYYYMMDDTHHMMSSZ.dump"
+restore_dir="$HOME/restore-tests/r2-YYYYMMDD"
+restore_db="finanzas_restore_test_YYYYMMDD"
+```
+
+Descargar y descifrar el dump sin sobrescribir una copia local:
+
+```bash
+mkdir -p "$restore_dir"
+chmod 700 "$HOME/restore-tests" "$restore_dir"
+rclone copyto "r2-finanzas:${restore_file}" "${restore_dir}/${restore_file}"
+docker compose -f /home/opc/finanzas/docker-compose.prod.yml exec -T postgres pg_restore --list < "${restore_dir}/${restore_file}" > /dev/null
+```
+
+Crear una base aislada, restaurar y listar sus tablas:
+
+```bash
+docker compose -f /home/opc/finanzas/docker-compose.prod.yml exec -T -e RESTORE_DB="$restore_db" postgres sh -c 'createdb -U "$POSTGRES_USER" "$RESTORE_DB"'
+docker compose -f /home/opc/finanzas/docker-compose.prod.yml exec -T -e RESTORE_DB="$restore_db" postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$RESTORE_DB" --no-owner --no-privileges' < "${restore_dir}/${restore_file}"
+docker compose -f /home/opc/finanzas/docker-compose.prod.yml exec -T -e RESTORE_DB="$restore_db" postgres sh -c 'psql -U "$POSTGRES_USER" -d "$RESTORE_DB" -c "\dt"'
+```
+
+Después de verificar el resultado, eliminar únicamente la base y el archivo
+temporales del simulacro:
+
+```bash
+docker compose -f /home/opc/finanzas/docker-compose.prod.yml exec -T -e RESTORE_DB="$restore_db" postgres sh -c 'dropdb -U "$POSTGRES_USER" "$RESTORE_DB"'
+rm -f "${restore_dir}/${restore_file}"
+rmdir "$restore_dir"
+```
+
+Último simulacro exitoso: **2026-08-22**. Se descargó un objeto cifrado desde
+R2, `pg_restore` terminó con código `0` y la base temporal contenía las 10
+tablas esperadas. Próximo simulacro: antes del **2026-11-22**.
 
 ## 10. Seguridad y diagnóstico
 
