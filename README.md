@@ -45,6 +45,7 @@ también `BETTER_AUTH_URL=https://<dominio>` en ese `.env`.
 ## Documentación
 
 - **`ARCHITECTURE.md`** — la ley del proyecto: stack, estructura, capas, agente, testing, observabilidad. Leerlo antes de tocar código.
+- **`docs/OPERATIONS.md`** — despliegue y operación de la VPS: red, Docker, DNS, HTTPS, backups, seguridad y recuperación.
 - **`docs/specs/`** — cada unidad de trabajo se define en un spec numerado con alcance y criterios de aceptación.
 - **`docs/COMMITS.md`** — formato de commits (Conventional Commits recortado, en inglés).
 
