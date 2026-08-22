@@ -56,6 +56,8 @@ En producción:
   30 días.
 - Healthchecks.io recibe un heartbeat después de cada backup validado y alerta
   por correo si no llega dentro de la hora de gracia.
+- UptimeRobot consulta cada cinco minutos el endpoint público `/health` y
+  alerta por correo cuando la aplicación o PostgreSQL dejan de responder.
 
 ### Trabajo operativo pendiente
 
@@ -651,7 +653,70 @@ rmdir "$restore_dir"
 R2, `pg_restore` terminó con código `0` y la base temporal contenía las 10
 tablas esperadas. Próximo simulacro: antes del **2026-11-22**.
 
-## 10. Seguridad y diagnóstico
+## 10. Monitoreo externo de disponibilidad
+
+Healthchecks.io y UptimeRobot cubren fallos distintos:
+
+- Healthchecks.io espera que el job de backup envíe un heartbeat. Detecta que
+  una tarea programada no terminó correctamente.
+- UptimeRobot inicia una solicitud desde fuera de la infraestructura. Detecta
+  que el dominio, Cloudflare, Caddy, el backend o PostgreSQL no responden.
+
+El monitor de UptimeRobot está configurado sin credenciales ni headers
+privados:
+
+| Campo                  | Valor                                      |
+| ---------------------- | ------------------------------------------ |
+| Tipo                   | `HTTP(s)`                                  |
+| Nombre                 | `Finanzas Production Health`               |
+| URL                    | `https://finanzas.esrichard.dev/health`    |
+| Intervalo              | 5 minutos                                  |
+| Respuesta saludable    | HTTP `200`                                 |
+| Contacto de alerta     | Correo del administrador                   |
+
+El endpoint ejecuta una consulta sencilla contra PostgreSQL con un timeout de
+dos segundos. En condiciones normales devuelve:
+
+```json
+{
+  "status": "ok",
+  "checks": {
+    "db": "ok"
+  }
+}
+```
+
+Si la base de datos falla o excede el timeout, responde HTTP `503` con estado
+`degraded`; UptimeRobot debe considerar esa respuesta una caída. Este monitor
+no prueba el inicio de sesión ni la ejecución del frontend en un navegador, por
+lo que es una verificación de disponibilidad, no una prueba funcional completa.
+
+Verificación manual desde cualquier equipo con acceso a Internet:
+
+```bash
+curl -i https://finanzas.esrichard.dev/health
+```
+
+`curl` hace una solicitud al endpoint público y `-i` incluye en la salida el
+código y los headers HTTP. El resultado esperado es `HTTP/2 200` o
+`HTTP/1.1 200`, junto con el JSON anterior. El monitor debe figurar `Up` y
+tener asociado el contacto de correo verificado.
+
+El monitor se activó y verificó en estado `Up` el **2026-08-22**.
+
+No se documentan identificadores internos de UptimeRobot. Se recomienda
+habilitar autenticación de dos factores en la cuenta y probar el canal de
+notificación desde su panel, sin provocar una caída deliberada de producción.
+
+Ante una alerta, comprobar en este orden:
+
+1. Abrir el endpoint `/health` desde una red externa.
+2. Revisar el estado de Cloudflare y la resolución DNS.
+3. Entrar por SSH y ejecutar `docker compose ps` en el directorio del proyecto.
+4. Consultar los logs recientes de Caddy, backend y PostgreSQL.
+5. Comprobar CPU, memoria, disco y conectividad de la VPS.
+
+## 11. Seguridad y diagnóstico
 
 ### Accesos SSH
 
@@ -714,8 +779,9 @@ uptime
 - Timer de backup sin ejecuciones recientes.
 - Backup con tamaño cero o validación distinta de `0`.
 - Check de Healthchecks.io en estado `Late` o `Down`.
+- Monitor de UptimeRobot en estado `Down` o con tiempos de respuesta anormales.
 
-## 11. Gestión de secretos
+## 12. Gestión de secretos
 
 - `.env` solo existe en la VPS y tiene permisos `600`.
 - Las llaves privadas SSH solo existen en los equipos administradores.
@@ -726,7 +792,7 @@ uptime
 - No copiar `.env` dentro de imágenes Docker ni añadirlo a Git.
 - Rotar credenciales ante cualquier sospecha de exposición.
 
-## 12. Recuperación de alto nivel
+## 13. Recuperación de alto nivel
 
 Para reconstruir el servicio después de perder la VPS:
 
