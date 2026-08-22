@@ -61,15 +61,23 @@ En producción:
 
 ### Trabajo operativo pendiente
 
+Prioridades de la próxima etapa:
+
 - Automatizar el despliegue al hacer `push` a `main` mediante GitHub Actions,
   usando una llave SSH exclusiva y restringida para CI/CD.
+- Configurar acceso visual a PostgreSQL con un usuario de solo lectura y una
+  conexión segura mediante túnel SSH.
+- Configurar alarmas de CPU, memoria, disco y tráfico.
+
+Mantenimiento recurrente y endurecimiento posterior:
+
 - Repetir trimestralmente el simulacro de restauración; el próximo vence el
   2026-11-22.
 - Habilitar access logs de Caddy preservando la IP real enviada por Cloudflare.
-- Restringir el acceso directo al origen o migrar a Cloudflare Tunnel.
+- Evaluar más adelante Cloudflare Tunnel o la restricción del origen a los
+  rangos oficiales de Cloudflare. Para la etapa actual se mantiene el proxy y
+  la exposición existente de `80` y `443`.
 - Restringir SSH a una IP administrativa o a un mecanismo de acceso privado.
-- Configurar alarmas de CPU, memoria, disco y tráfico.
-- Configurar acceso visual a PostgreSQL con un usuario de solo lectura.
 
 El backup externo y el restore trimestral son requisitos de
 `ARCHITECTURE.md`. La arquitectura oficial usa el timer `systemd` del host,
