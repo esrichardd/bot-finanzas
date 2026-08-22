@@ -61,8 +61,6 @@ En producción:
   usando una llave SSH exclusiva y restringida para CI/CD.
 - Repetir trimestralmente el simulacro de restauración; el próximo vence el
   2026-11-22.
-- Migrar el backup desde el timer del host al sidecar definido en
-  `ARCHITECTURE.md`, conservando R2 y el mismo procedimiento de validación.
 - Añadir heartbeat para detectar respaldos que dejan de ejecutarse.
 - Habilitar access logs de Caddy preservando la IP real enviada por Cloudflare.
 - Restringir el acceso directo al origen o migrar a Cloudflare Tunnel.
@@ -71,8 +69,8 @@ En producción:
 - Configurar acceso visual a PostgreSQL con un usuario de solo lectura.
 
 El backup externo y el restore trimestral son requisitos de
-`ARCHITECTURE.md`. La copia externa y el primer restore ya están implementados;
-queda pendiente alinear la automatización con el sidecar especificado allí.
+`ARCHITECTURE.md`. La arquitectura oficial usa el timer `systemd` del host,
+copia cifrada en R2 y un simulacro de restauración trimestral.
 
 ## 2. Variables usadas en esta guía
 
@@ -389,7 +387,7 @@ docker compose -f docker-compose.prod.yml logs --tail=200 <SERVICE_NAME>
 
 Servicios válidos actualmente: `postgres`, `backend`, `frontend` y `caddy`.
 
-## 9. Backups locales de PostgreSQL
+## 9. Backups de PostgreSQL
 
 ### Diseño actual
 
