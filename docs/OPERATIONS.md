@@ -54,6 +54,8 @@ En producción:
 - Hay un respaldo lógico local diario de PostgreSQL con retención de 14 días.
 - Cada respaldo se cifra en la VPS y se copia a Cloudflare R2 con retención de
   30 días.
+- Healthchecks.io recibe un heartbeat después de cada backup validado y alerta
+  por correo si no llega dentro de la hora de gracia.
 
 ### Trabajo operativo pendiente
 
@@ -61,7 +63,6 @@ En producción:
   usando una llave SSH exclusiva y restringida para CI/CD.
 - Repetir trimestralmente el simulacro de restauración; el próximo vence el
   2026-11-22.
-- Añadir heartbeat para detectar respaldos que dejan de ejecutarse.
 - Habilitar access logs de Caddy preservando la IP real enviada por Cloudflare.
 - Restringir el acceso directo al origen o migrar a Cloudflare Tunnel.
 - Restringir SSH a una IP administrativa o a un mecanismo de acceso privado.
@@ -400,6 +401,7 @@ Servicios válidos actualmente: `postgres`, `backend`, `frontend` y `caddy`.
 - Usuario de ejecución: `opc`, con grupo suplementario `docker`.
 - Remoto R2 base: `r2`.
 - Remoto con cifrado del lado del cliente: `r2-finanzas`.
+- Monitor de ausencia: Healthchecks.io con una hora de gracia.
 
 El formato custom se valida con `pg_restore --list` antes de considerar exitosa
 la copia local. La copia externa se valida con `rclone cryptcheck`.
@@ -458,9 +460,16 @@ readonly BACKUP_DIR="/home/opc/backups/postgres"
 readonly COMPOSE_FILE="${PROJECT_DIR}/docker-compose.prod.yml"
 readonly RCLONE_CONFIG="/home/opc/.config/rclone/rclone.conf"
 readonly RCLONE_REMOTE="r2-finanzas:"
+readonly HEALTHCHECK_URL_FILE="/home/opc/.config/finanzas/backup-healthcheck-url"
 readonly TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 readonly BACKUP_NAME="finanzas-${TIMESTAMP}.dump"
 readonly BACKUP_FILE="${BACKUP_DIR}/${BACKUP_NAME}"
+readonly HEALTHCHECK_URL="$(<"$HEALTHCHECK_URL_FILE")"
+
+if [[ -z "$HEALTHCHECK_URL" ]]; then
+  printf 'Error: the backup heartbeat URL is empty\n' >&2
+  exit 1
+fi
 
 umask 077
 mkdir -p "$BACKUP_DIR"
@@ -492,6 +501,17 @@ find "$BACKUP_DIR" \
   -name 'finanzas-*.dump' \
   -mtime +13 \
   -delete
+
+if ! /usr/bin/curl \
+  --fail \
+  --silent \
+  --show-error \
+  --max-time 10 \
+  --retry 3 \
+  --output /dev/null \
+  "$HEALTHCHECK_URL"; then
+  printf 'Warning: backup succeeded but heartbeat delivery failed\n' >&2
+fi
 
 printf 'Local and off-site backup completed: %s\n' "$BACKUP_FILE"
 ```
@@ -554,6 +574,36 @@ Para ejecutar una copia inmediata:
 ```bash
 sudo systemctl start finanzas-backup.service
 ```
+
+### Heartbeat del backup
+
+Healthchecks.io supervisa la ausencia del job; no consulta la base de datos ni
+accede a la VPS. El check usa la misma expresión `OnCalendar` de las 03:15 en
+`America/Bogota`, una hora de gracia y notificaciones por correo.
+
+La Ping URL se guarda en:
+
+```text
+/home/opc/.config/finanzas/backup-healthcheck-url
+```
+
+El directorio tiene permisos `700` y el archivo permisos `600`. La URL no se
+incluye en el repositorio ni en este documento. El script la llama únicamente
+después de validar tanto el dump local como la copia cifrada en R2. Si el ping
+falla, se registra una advertencia; Healthchecks.io enviará una alerta cuando
+venza la hora de gracia.
+
+Verificación manual:
+
+```bash
+sudo systemctl start finanzas-backup.service
+sudo journalctl -u finanzas-backup.service -n 20 --no-pager
+```
+
+La ejecución debe terminar con `Local and off-site backup completed`, sin la
+advertencia del heartbeat, y el check debe aparecer `Up`. La Ping URL se trata
+como un secreto: si se publica, crear un check nuevo, actualizar el archivo de
+la VPS, verificar el nuevo heartbeat y eliminar el check expuesto.
 
 ### Restauración
 
@@ -663,12 +713,15 @@ uptime
 - Respuestas `5xx` frecuentes.
 - Timer de backup sin ejecuciones recientes.
 - Backup con tamaño cero o validación distinta de `0`.
+- Check de Healthchecks.io en estado `Late` o `Down`.
 
 ## 11. Gestión de secretos
 
 - `.env` solo existe en la VPS y tiene permisos `600`.
 - Las llaves privadas SSH solo existen en los equipos administradores.
 - Los backups se consideran sensibles porque contienen todos los datos.
+- La Ping URL de Healthchecks.io es un secreto operativo y tiene permisos
+  `600` en la VPS.
 - No imprimir `docker compose config` sin `--quiet` en canales compartidos.
 - No copiar `.env` dentro de imágenes Docker ni añadirlo a Git.
 - Rotar credenciales ante cualquier sospecha de exposición.
@@ -687,6 +740,7 @@ Para reconstruir el servicio después de perder la VPS:
 8. Validar `/health`, autenticación y datos.
 9. Reactivar el timer y comprobar una nueva copia.
 
-Hasta que exista una copia externa, la pérdida de la instancia también implica
-la pérdida de los respaldos locales. Resolver ese punto es la siguiente tarea
-operativa prioritaria.
+La copia cifrada en R2 permite recuperar los datos aunque se pierda la
+instancia. La recuperación depende de conservar fuera de la VPS la contraseña y
+el salt de `rclone crypt`; las credenciales de acceso a R2 pueden rotarse o
+recrearse. El procedimiento debe volver a probarse trimestralmente.
