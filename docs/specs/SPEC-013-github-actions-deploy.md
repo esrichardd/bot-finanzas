@@ -44,8 +44,8 @@ No incluye:
 - La host key de la VPS se fija en `known_hosts`; no se permite
   `StrictHostKeyChecking=no`.
 - Los secretos viven en el environment de GitHub `production`.
-- La variable de repositorio `PRODUCTION_DEPLOY_ENABLED` debe permanecer
-  distinta de `true` hasta completar y probar la configuración de la VPS.
+- La variable de repositorio `PRODUCTION_DEPLOY_ENABLED` se habilita solamente
+  después de completar y probar la configuración de la VPS.
 
 ## Checks requeridos
 
@@ -69,9 +69,9 @@ Frontend:
 - [x] Existe `scripts/deploy-production.sh`.
 - [x] Los checks no reciben secretos de producción.
 - [x] El job de deploy queda deshabilitado hasta la activación explícita.
-- [ ] La llave exclusiva está instalada y restringida en la VPS.
-- [ ] El environment `production` contiene los cuatro secrets requeridos.
-- [ ] El primer deploy manual desde Actions termina correctamente.
+- [x] La llave exclusiva está instalada y restringida en la VPS.
+- [x] El environment `production` contiene los cuatro secrets requeridos.
+- [x] El primer deploy manual desde Actions termina correctamente.
 - [ ] Un push posterior a `main` despliega automáticamente.
-- [ ] UptimeRobot permanece `Up` después de la prueba.
-- [ ] `docs/OPERATIONS.md` registra la activación y fecha de verificación.
+- [x] UptimeRobot permanece `Up` después de la prueba.
+- [x] `docs/OPERATIONS.md` registra la activación y fecha de verificación.

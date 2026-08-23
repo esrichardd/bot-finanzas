@@ -58,14 +58,13 @@ En producción:
   por correo si no llega dentro de la hora de gracia.
 - UptimeRobot consulta cada cinco minutos el endpoint público `/health` y
   alerta por correo cuando la aplicación o PostgreSQL dejan de responder.
+- GitHub Actions valida backend y frontend y despliega automáticamente los
+  pushes a `main` mediante una llave SSH exclusiva y restringida.
 
 ### Trabajo operativo pendiente
 
 Prioridades de la próxima etapa:
 
-- Completar la activación del despliegue al hacer `push` a `main` mediante
-  GitHub Actions. El workflow y el script están preparados, pero el deploy
-  permanece deshabilitado hasta instalar la llave y los secrets.
 - Configurar acceso visual a PostgreSQL con un usuario de solo lectura y una
   conexión segura mediante túnel SSH.
 - Configurar alarmas de CPU, memoria, disco y tráfico.
@@ -408,10 +407,10 @@ El workflow `.github/workflows/ci-deploy.yml` ejecuta en paralelo:
 - backend: instalación reproducible, typecheck, pruebas y build;
 - frontend: instalación reproducible, lint, pruebas y build.
 
-Los pull requests solo ejecutan CI. Un push a `main` puede ejecutar el deploy
-después de ambos jobs, siempre que la variable de repositorio
-`PRODUCTION_DEPLOY_ENABLED` sea exactamente `true`. Mientras la variable no
-exista o tenga otro valor, el job aparece como omitido y producción no cambia.
+Los pull requests solo ejecutan CI. Un push a `main` ejecuta el deploy después
+de ambos jobs porque la variable de repositorio `PRODUCTION_DEPLOY_ENABLED`
+está configurada como `true`. Cambiarla a otro valor o eliminarla desactiva el
+deploy sin desactivar los checks de CI.
 
 El job de deploy usa el environment `production` y estos secrets:
 
@@ -441,9 +440,22 @@ GitHub comprueba finalmente el endpoint público
 `https://finanzas.esrichard.dev/health`. No se copian secretos de aplicación:
 el archivo `.env` continúa existiendo únicamente en la VPS.
 
-La activación y el procedimiento para rotar la llave se completarán después de
-instalar los secrets y verificar el primer deploy manual. Especificación:
-`docs/specs/SPEC-013-github-actions-deploy.md`.
+La automatización se activó el **2026-08-23**. El primer workflow manual completó
+CI, backup previo, conexión SSH restringida, reconstrucción, salud interna y
+salud pública. UptimeRobot permaneció `Up` y Healthchecks.io registró el backup.
+
+Para desactivar despliegues sin afectar CI, eliminar la variable
+`PRODUCTION_DEPLOY_ENABLED` o cambiar su valor a `false`. Para rotar la llave:
+
+1. desactivar temporalmente el deploy;
+2. generar un par Ed25519 nuevo y exclusivo;
+3. añadir primero la nueva llave pública restringida a `authorized_keys`;
+4. sustituir `VPS_SSH_PRIVATE_KEY` en el environment `production`;
+5. ejecutar y validar un workflow manual;
+6. retirar de `authorized_keys` la llave pública anterior;
+7. eliminar de forma segura las copias innecesarias de la llave privada vieja.
+
+Especificación: `docs/specs/SPEC-013-github-actions-deploy.md`.
 
 ## 9. Backups de PostgreSQL
 
