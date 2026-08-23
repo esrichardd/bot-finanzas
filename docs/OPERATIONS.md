@@ -63,8 +63,9 @@ En producción:
 
 Prioridades de la próxima etapa:
 
-- Automatizar el despliegue al hacer `push` a `main` mediante GitHub Actions,
-  usando una llave SSH exclusiva y restringida para CI/CD.
+- Completar la activación del despliegue al hacer `push` a `main` mediante
+  GitHub Actions. El workflow y el script están preparados, pero el deploy
+  permanece deshabilitado hasta instalar la llave y los secrets.
 - Configurar acceso visual a PostgreSQL con un usuario de solo lectura y una
   conexión segura mediante túnel SSH.
 - Configurar alarmas de CPU, memoria, disco y tráfico.
@@ -376,7 +377,9 @@ normalmente encabezados como `server: cloudflare` y `cf-ray`.
 
 ## 8. Actualizaciones de la aplicación
 
-Procedimiento manual actual:
+### Procedimiento manual de respaldo
+
+Este procedimiento permanece disponible si GitHub Actions no está operativo:
 
 ```bash
 cd ~/finanzas
@@ -397,6 +400,50 @@ docker compose -f docker-compose.prod.yml logs --tail=200 <SERVICE_NAME>
 ```
 
 Servicios válidos actualmente: `postgres`, `backend`, `frontend` y `caddy`.
+
+### CI y despliegue mediante GitHub Actions
+
+El workflow `.github/workflows/ci-deploy.yml` ejecuta en paralelo:
+
+- backend: instalación reproducible, typecheck, pruebas y build;
+- frontend: instalación reproducible, lint, pruebas y build.
+
+Los pull requests solo ejecutan CI. Un push a `main` puede ejecutar el deploy
+después de ambos jobs, siempre que la variable de repositorio
+`PRODUCTION_DEPLOY_ENABLED` sea exactamente `true`. Mientras la variable no
+exista o tenga otro valor, el job aparece como omitido y producción no cambia.
+
+El job de deploy usa el environment `production` y estos secrets:
+
+| Secret                | Contenido                                       |
+| --------------------- | ----------------------------------------------- |
+| `VPS_HOST`            | Host o IPv4 pública de la VPS                   |
+| `VPS_USER`            | Usuario de despliegue, actualmente `opc`        |
+| `VPS_SSH_PRIVATE_KEY` | Llave privada exclusiva de GitHub Actions       |
+| `VPS_SSH_KNOWN_HOSTS` | Entrada verificada de `known_hosts` para la VPS |
+
+La llave no abre una shell general. Su entrada en `authorized_keys` fuerza la
+ejecución de `/home/opc/finanzas/scripts/deploy-production.sh`, rechaza
+comandos distintos de `deploy <SHA>` y deshabilita forwarding y PTY.
+
+El script:
+
+1. adquiere un lock para impedir despliegues simultáneos;
+2. exige que el checkout esté limpio y en `main`;
+3. verifica que el SHA solicitado pertenezca a `origin/main`;
+4. ejecuta el backup local y externo mediante
+   `finanzas-backup.service`;
+5. avanza Git únicamente mediante fast-forward;
+6. valida y reconstruye Docker Compose;
+7. espera hasta tres minutos por la salud interna del backend y PostgreSQL.
+
+GitHub comprueba finalmente el endpoint público
+`https://finanzas.esrichard.dev/health`. No se copian secretos de aplicación:
+el archivo `.env` continúa existiendo únicamente en la VPS.
+
+La activación y el procedimiento para rotar la llave se completarán después de
+instalar los secrets y verificar el primer deploy manual. Especificación:
+`docs/specs/SPEC-013-github-actions-deploy.md`.
 
 ## 9. Backups de PostgreSQL
 
@@ -673,14 +720,14 @@ Healthchecks.io y UptimeRobot cubren fallos distintos:
 El monitor de UptimeRobot está configurado sin credenciales ni headers
 privados:
 
-| Campo                  | Valor                                      |
-| ---------------------- | ------------------------------------------ |
-| Tipo                   | `HTTP(s)`                                  |
-| Nombre                 | `Finanzas Production Health`               |
-| URL                    | `https://finanzas.esrichard.dev/health`    |
-| Intervalo              | 5 minutos                                  |
-| Respuesta saludable    | HTTP `200`                                 |
-| Contacto de alerta     | Correo del administrador                   |
+| Campo               | Valor                                   |
+| ------------------- | --------------------------------------- |
+| Tipo                | `HTTP(s)`                               |
+| Nombre              | `Finanzas Production Health`            |
+| URL                 | `https://finanzas.esrichard.dev/health` |
+| Intervalo           | 5 minutos                               |
+| Respuesta saludable | HTTP `200`                              |
+| Contacto de alerta  | Correo del administrador                |
 
 El endpoint ejecuta una consulta sencilla contra PostgreSQL con un timeout de
 dos segundos. En condiciones normales devuelve:
