@@ -18,6 +18,7 @@ Incluye:
 - deploy únicamente después de que todos los checks pasen;
 - llave SSH exclusiva, con comando forzado y sin sesión interactiva;
 - despliegue serializado del SHA exacto que disparó el workflow;
+- rechazo explícito de SHAs anteriores o divergentes respecto de producción;
 - backup validado antes de ejecutar migraciones;
 - actualización Git fast-forward;
 - reconstrucción con Docker Compose;
@@ -71,9 +72,12 @@ Frontend:
 - [x] Los checks no reciben secretos de producción.
 - [x] El job de deploy queda deshabilitado hasta la activación explícita.
 - [x] Los pushes exclusivamente documentales conservan CI y omiten el deploy.
+- [x] El script rechaza un SHA anterior o divergente y verifica que `HEAD`
+      coincida exactamente con el SHA solicitado antes de reconstruir.
 - [x] La llave exclusiva está instalada y restringida en la VPS.
 - [x] El environment `production` contiene los cuatro secrets requeridos.
 - [x] El primer deploy manual desde Actions termina correctamente.
 - [x] Un push posterior a `main` despliega automáticamente.
 - [x] UptimeRobot permanece `Up` después de la prueba.
-- [x] `docs/OPERATIONS.md` registra la activación y fecha de verificación.
+- [x] `docs/OPERATIONS.md` registra la activación, fecha de verificación,
+      reconstrucción completa del acceso restringido y fallback manual seguro.

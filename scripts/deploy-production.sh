@@ -51,11 +51,19 @@ git cat-file -e "${target_sha}^{commit}" 2>/dev/null ||
 git merge-base --is-ancestor "${target_sha}" refs/remotes/origin/main ||
   fail "the requested commit does not belong to origin/main"
 
+readonly current_sha="$(git rev-parse HEAD)"
+git merge-base --is-ancestor "${current_sha}" "${target_sha}" ||
+  fail "the requested commit is older than or diverges from production HEAD"
+
 printf 'Creating a validated pre-deployment backup...\n'
 sudo -n systemctl start finanzas-backup.service
 
 printf 'Updating production to commit %s...\n' "${target_sha}"
 git merge --ff-only "${target_sha}"
+
+readonly deployed_sha="$(git rev-parse HEAD)"
+[[ "${deployed_sha}" == "${target_sha}" ]] ||
+  fail "production HEAD does not match the requested commit"
 
 docker compose -f "${COMPOSE_FILE}" config --quiet
 docker compose -f "${COMPOSE_FILE}" up --build -d --remove-orphans
