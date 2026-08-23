@@ -1,6 +1,6 @@
 # SPEC-013: CI y despliegue automático a producción
 
-**Estado: 🟡 en implementación — 2026-08-23**
+**Estado: ✅ completado — 2026-08-23**
 
 Ejecutar cumpliendo `ARCHITECTURE.md` y `docs/OPERATIONS.md`.
 
@@ -74,6 +74,6 @@ Frontend:
 - [x] La llave exclusiva está instalada y restringida en la VPS.
 - [x] El environment `production` contiene los cuatro secrets requeridos.
 - [x] El primer deploy manual desde Actions termina correctamente.
-- [ ] Un push posterior a `main` despliega automáticamente.
+- [x] Un push posterior a `main` despliega automáticamente.
 - [x] UptimeRobot permanece `Up` después de la prueba.
 - [x] `docs/OPERATIONS.md` registra la activación y fecha de verificación.

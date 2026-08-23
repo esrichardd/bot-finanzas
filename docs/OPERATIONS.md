@@ -450,6 +450,7 @@ el archivo `.env` continúa existiendo únicamente en la VPS.
 La automatización se activó el **2026-08-23**. El primer workflow manual completó
 CI, backup previo, conexión SSH restringida, reconstrucción, salud interna y
 salud pública. UptimeRobot permaneció `Up` y Healthchecks.io registró el backup.
+Un push posterior a `main` completó también el despliegue automático end-to-end.
 
 Para desactivar despliegues sin afectar CI, eliminar la variable
 `PRODUCTION_DEPLOY_ENABLED` o cambiar su valor a `false`. Para rotar la llave:
