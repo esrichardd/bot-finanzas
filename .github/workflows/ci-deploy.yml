@@ -17,6 +17,54 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  changes:
+    name: Detect deployment changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      deploy_required: ${{ steps.deployment.outputs.deploy_required }}
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Classify changed files
+        id: deployment
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+
+          deploy_required=false
+
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            deploy_required=true
+          elif [[ "${EVENT_NAME}" == "push" ]]; then
+            if [[ "${BEFORE_SHA}" =~ ^0+$ ]]; then
+              deploy_required=true
+            else
+              while IFS= read -r changed_file; do
+                [[ -n "${changed_file}" ]] || continue
+
+                case "${changed_file}" in
+                  docs/* | *.md)
+                    ;;
+                  *)
+                    printf 'Runtime change detected: %s\n' "${changed_file}"
+                    deploy_required=true
+                    break
+                    ;;
+                esac
+              done < <(git diff --name-only "${BEFORE_SHA}" "${CURRENT_SHA}")
+            fi
+          fi
+
+          printf 'deploy_required=%s\n' "${deploy_required}" | tee -a "${GITHUB_OUTPUT}"
+
   backend:
     name: Backend checks
     runs-on: ubuntu-latest
@@ -88,11 +136,13 @@ jobs:
   deploy:
     name: Deploy production
     needs:
+      - changes
       - backend
       - frontend
     if: >-
       github.ref == 'refs/heads/main' &&
       github.event_name != 'pull_request' &&
+      needs.changes.outputs.deploy_required == 'true' &&
       vars.PRODUCTION_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30

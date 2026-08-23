@@ -404,13 +404,20 @@ Servicios válidos actualmente: `postgres`, `backend`, `frontend` y `caddy`.
 
 El workflow `.github/workflows/ci-deploy.yml` ejecuta en paralelo:
 
+- detección: clasifica si el push contiene cambios que afectan producción;
 - backend: instalación reproducible, typecheck, pruebas y build;
 - frontend: instalación reproducible, lint, pruebas y build.
 
-Los pull requests solo ejecutan CI. Un push a `main` ejecuta el deploy después
-de ambos jobs porque la variable de repositorio `PRODUCTION_DEPLOY_ENABLED`
-está configurada como `true`. Cambiarla a otro valor o eliminarla desactiva el
-deploy sin desactivar los checks de CI.
+Los pull requests solo ejecutan CI. En pushes a `main`, los cambios que estén
+exclusivamente dentro de `docs/` o cuyos nombres terminen en `.md` ejecutan los
+checks, pero omiten el deploy, el backup previo y la reconstrucción. Si el mismo
+push contiene al menos otro archivo, se considera un cambio de producción.
+
+Un lanzamiento mediante `workflow_dispatch` siempre fuerza el deploy. En los
+demás pushes elegibles, el deploy se ejecuta después de ambos jobs porque la
+variable de repositorio `PRODUCTION_DEPLOY_ENABLED` está configurada como
+`true`. Cambiarla a otro valor o eliminarla desactiva el deploy sin desactivar
+los checks de CI.
 
 El job de deploy usa el environment `production` y estos secrets:
 

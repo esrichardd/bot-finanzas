@@ -22,6 +22,7 @@ Incluye:
 - actualización Git fast-forward;
 - reconstrucción con Docker Compose;
 - verificaciones de salud interna y pública;
+- omisión del deploy para pushes exclusivamente documentales;
 - procedimiento manual como fallback.
 
 No incluye:
@@ -69,6 +70,7 @@ Frontend:
 - [x] Existe `scripts/deploy-production.sh`.
 - [x] Los checks no reciben secretos de producción.
 - [x] El job de deploy queda deshabilitado hasta la activación explícita.
+- [x] Los pushes exclusivamente documentales conservan CI y omiten el deploy.
 - [x] La llave exclusiva está instalada y restringida en la VPS.
 - [x] El environment `production` contiene los cuatro secrets requeridos.
 - [x] El primer deploy manual desde Actions termina correctamente.
