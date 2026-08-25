@@ -61,6 +61,8 @@ En producción:
   por correo si no llega dentro de la hora de gracia.
 - UptimeRobot consulta cada cinco minutos el endpoint público `/health` y
   alerta por correo cuando la aplicación o PostgreSQL dejan de responder.
+- Grafana Alloy envía métricas del host a Grafana Cloud para mostrar recursos
+  y alertar por CPU, memoria, disco o ausencia de telemetría.
 - GitHub Actions valida backend y frontend y despliega automáticamente los
   pushes a `main` mediante una llave SSH exclusiva y restringida.
 

@@ -51,6 +51,13 @@ red privada de Compose.
 El dominio raíz y `www` se sirven por separado desde Vercel; la aplicación de
 finanzas vive en su subdominio y se ejecuta en la VPS.
 
+```text
+VPS host -- métricas --> Grafana Alloy -- HTTPS saliente --> Grafana Cloud
+                                                                  |
+                                                                  v
+                                                        alertas por correo
+```
+
 ## 3. Componentes y responsabilidades
 
 | Componente         | Responsabilidad                                                               |
@@ -62,6 +69,8 @@ finanzas vive en su subdominio y se ejecuta en la VPS.
 | Cloudflare         | DNS y proxy público del subdominio de la aplicación                           |
 | GitHub Actions     | Checks y despliegue automatizado del commit exacto validado                   |
 | `systemd` + R2     | Backup lógico diario, cifrado, copia externa y heartbeat                      |
+| Grafana Alloy      | Recolección y envío saliente de métricas del host                             |
+| Grafana Cloud      | Dashboards y alertas de CPU, memoria, disco y ausencia de métricas            |
 | Monitores externos | Disponibilidad pública y ausencia del job de backup                           |
 
 ### Límites
@@ -148,6 +157,8 @@ reglas internas se detallan en las arquitecturas de backend y frontend.
 - UptimeRobot comprueba públicamente `/health`.
 - El backup diario usa `pg_dump -Fc`, valida el dump, cifra la copia con
   `rclone crypt`, la envía a Cloudflare R2 y notifica a Healthchecks.io.
+- Grafana Alloy envía métricas estándar del host a Grafana Cloud, que mantiene
+  dashboards y alertas por correo para CPU, memoria, disco y falta de métricas.
 
 Los comandos, retenciones, verificaciones y procedimientos de restauración
 están en `docs/operations/`.

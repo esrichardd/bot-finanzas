@@ -26,6 +26,7 @@ decisión nueva siempre existió.
 | [ADR-008](ADR-008-same-origin-compose-topology.md)       | Aceptado | Servir frontend y API bajo el mismo origen             |
 | [ADR-009](ADR-009-exact-sha-restricted-ssh-deploy.md)    | Aceptado | Desplegar un SHA exacto mediante SSH restringido       |
 | [ADR-010](ADR-010-encrypted-offsite-postgres-backups.md) | Aceptado | Mantener backups PostgreSQL cifrados fuera de la VPS   |
+| [ADR-011](ADR-011-grafana-cloud-host-observability.md)   | Aceptado | Observar la VPS con Grafana Cloud y Grafana Alloy      |
 
 La arquitectura describe cómo funciona hoy el sistema; los ADR explican por
 qué se eligieron sus decisiones más costosas de cambiar. El código y las

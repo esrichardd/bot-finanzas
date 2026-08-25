@@ -4,6 +4,8 @@
 
 Este runbook documenta los monitores externos, las comprobaciones de seguridad,
 el diagnóstico del host, la gestión de secretos y la recuperación general.
+Las métricas internas y alertas de Grafana se documentan en el
+[runbook de observabilidad](observability.md).
 
 ## 1. Monitoreo externo de disponibilidad
 
@@ -132,6 +134,7 @@ uptime
 - Backup con tamaño cero o validación distinta de `0`.
 - Check de Healthchecks.io en estado `Late` o `Down`.
 - Monitor de UptimeRobot en estado `Down` o con tiempos de respuesta anormales.
+- Alerta de Grafana por CPU, memoria, disco raíz o ausencia de métricas.
 
 ## 3. Gestión de secretos
 
@@ -159,6 +162,8 @@ Para reconstruir el servicio después de perder la VPS:
 7. Actualizar el registro DNS del subdominio a la nueva IP.
 8. Validar `/health`, autenticación y datos.
 9. Reactivar el timer y comprobar una nueva copia según el runbook de backups.
+10. Reinstalar Alloy y validar las alertas según el
+    [runbook de observabilidad](observability.md).
 
 La copia cifrada en R2 permite recuperar los datos aunque se pierda la
 instancia. La recuperación depende de conservar fuera de la VPS la contraseña y
