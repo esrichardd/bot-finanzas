@@ -155,11 +155,7 @@ jobs:
         run: docker compose -f docker-compose.prod.yml config --quiet
 
       - name: Validate PostgreSQL admin proxy
-        run: >-
-          docker run --rm
-          -v "${PWD}/postgres-admin/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro"
-          haproxy:3.2.22-alpine
-          haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg
+        run: docker build --tag finanzas-postgres-admin-proxy:validation ./postgres-admin
 
   deploy:
     name: Deploy production

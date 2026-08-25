@@ -28,7 +28,8 @@ services:
       retries: 10
 
   postgres-admin-proxy:
-    image: haproxy:3.2.22-alpine
+    build:
+      context: ./postgres-admin
     user: haproxy
     read_only: true
     cap_drop:
@@ -37,8 +38,6 @@ services:
       - no-new-privileges:true
     ports:
       - "127.0.0.1:15432:15432"
-    volumes:
-      - ./postgres-admin/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     networks:
       - internal
       - admin
