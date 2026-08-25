@@ -2,17 +2,21 @@
 
 Estado: ✅ completado 2026-07-30
 
-Ejecutar cumpliendo `ARCHITECTURE.md` (normativo) y `docs/DATABASE.md` (decisión **D4**: una tabla, jerarquía de un nivel, sistema + propias). Los snippets son la implementación de referencia — seguirlos literalmente salvo que contradigan ARCHITECTURE.md, en cuyo caso ARCHITECTURE.md gana y se reporta la discrepancia.
+Ejecutar cumpliendo `ARCHITECTURE.md`, `backend/ARCHITECTURE.md` y
+`docs/DATABASE.md` y
+[ADR-006](../architecture/adr/ADR-006-single-level-category-tree.md). Los snippets reflejan el momento de
+implementación; ante una contradicción, prevalece la documentación vigente.
 
 ## Objetivo
 
-Primer módulo de dominio completo: tabla `categories` con jerarquía de un nivel y categorías del sistema + del usuario, service con casos de uso y errores de dominio, rutas protegidas con `requireAuth` y schemas Zod, seed de categorías del sistema vía migración, y tests de integración (incluido el primer test real de scoping entre usuarios). **Este módulo es la plantilla que replicarán todos los módulos de dominio futuros.**
+Primer módulo de dominio completo: tabla `categories` con jerarquía de un nivel y categorías del sistema + del usuario, service con casos de uso y errores de dominio, rutas protegidas con `requireAuth` y schemas Zod, seed de categorías del sistema vía migración, y tests de integración (incluido el primer test real de scoping entre usuarios). **Este módulo establece el patrón usado por los demás módulos de dominio.**
 
 ## Alcance
 
 **Incluye:** schema + migración + seed, service (listar, crear, renombrar, archivar), rutas, tests unit + integration.
 
-**NO incluye (no agregar "de paso"):** campo `kind` income/expense (lo decidirá SPEC-004 si lo necesita), iconos, capabilities del agente, endpoints de des-archivado, más de un nivel de jerarquía, delete físico.
+**No incluye:** campo `kind` income/expense, iconos, endpoints de
+des-archivado, más de un nivel de jerarquía ni delete físico.
 
 ## Contexto de diseño (leer antes de codificar)
 
@@ -64,7 +68,9 @@ Generar la migración: `cd backend && npm run db:generate`. Verificar que el `.s
 
 ## Paso 2 — Seed de categorías del sistema (migración custom)
 
-Las categorías del sistema tienen **UUIDs fijos** (el agente y los tests dependen de ids estables). Se siembran en una migración versionada, no en un script aparte.
+Las categorías del sistema tienen **UUIDs fijos** porque los tests y referencias
+persistentes dependen de ids estables. Se siembran en una migración versionada,
+no en un script aparte.
 
 1. Generar migración vacía: `npx drizzle-kit generate --custom --name seed-system-categories`
 2. Escribir en el `.sql` generado:
@@ -87,7 +93,7 @@ INSERT INTO "categories" ("id", "user_id", "parent_id", "name", "color") VALUES
 ('00000000-0000-4000-8000-000000000014', NULL, NULL, 'Otros ingresos', '#1D9E75');
 ```
 
-Nota: 'Comisiones' es obligatoria — la decisión D2 de DATABASE.md depende de ella. El resto es editable por el humano antes de aplicar; no cambiar los UUIDs después de aplicada.
+Nota: 'Comisiones' es obligatoria para las comisiones de transferencias descritas en ADR-003. El resto es editable por el humano antes de aplicar; no cambiar los UUIDs después de aplicada.
 
 ## Paso 3 — Types, schemas Zod y helper de acceso
 
@@ -430,7 +436,9 @@ curl -i -X DELETE $BASE/categories/<ID_GIMNASIO> -b cookies.txt
 curl -i $BASE/categories -b cookies.txt
 ```
 
-- [ ] Pasos 1–6 con los códigos y comportamientos indicados. Pendiente de verificación manual con compose levantado.
+- [ ] Pasos 1–6 con los códigos y comportamientos indicados. No se registró
+      evidencia de esta ejecución manual; los casos equivalentes están cubiertos
+      por la suite de integración.
 
 ### Criterios generales
 
@@ -444,5 +452,5 @@ curl -i $BASE/categories -b cookies.txt
 **NO ejecutar `git commit` ni ningún comando de git.** Al terminar, el ejecutor debe:
 
 1. Marcar `Estado: ✅ completado <fecha>` y tildar los checkboxes cumplidos (dejar destildado lo no verificado, con nota).
-2. Actualizar la tabla de orden de construcción en `docs/DATABASE.md` (SPEC-002 → ✅).
+2. Confirmar que `docs/DATABASE.md` refleja las categorías implementadas.
 3. Responder con: resumen de lo implementado, archivos creados/modificados, resultado de tests y typecheck, cualquier desviación del spec con su justificación, y el **mensaje de commit recomendado** según `docs/COMMITS.md` (sugerencia base: `feat(categories): categories module with hierarchy and system defaults` con `SPEC-002` en el cuerpo). El commit lo hace el humano.

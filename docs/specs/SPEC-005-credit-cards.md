@@ -2,7 +2,10 @@
 
 Estado: ✅ completado 2026-07-30
 
-Ejecutar cumpliendo `ARCHITECTURE.md` (normativo) y `docs/DATABASE.md` (decisiones **D1** y **D3**, con el corolario una-cuenta-una-moneda). Los snippets son la implementación de referencia — ante contradicción, gana ARCHITECTURE.md y se reporta la discrepancia.
+Ejecutar cumpliendo `ARCHITECTURE.md`, `backend/ARCHITECTURE.md` y
+`docs/DATABASE.md`, [ADR-004](../architecture/adr/ADR-004-credit-cards-as-accounts.md)
+y [ADR-005](../architecture/adr/ADR-005-crypto-as-currencies.md). Ante una contradicción,
+prevalece la documentación vigente.
 
 ## Objetivo
 
@@ -12,15 +15,18 @@ Completar los tipos de cuenta: (a) el satélite `credit_card_details` con sus n�
 
 **Incluye:** módulo nuevo `credit-cards` (tabla satélite 1:1, upsert y lectura con derivados, funciones puras de fechas con unit tests), función pública `getAccountBalance` en movements, migración de seed cripto, tests.
 
-**NO incluye (no agregar "de paso"):** valoración de portafolio cripto ni precios (`asset_prices` es spec futuro), cobro automático de la cuota de manejo (el campo es metadata; el cobro es un gasto manual o un job futuro), alertas de fechas de pago, endpoints de borrado de detalles, intereses o amortización.
+**No incluye:** valoración de portafolio cripto, precios, cobro automático de la
+cuota de manejo, alertas de fechas de pago, borrado de detalles, intereses ni
+amortización. La cuota de manejo es metadata y su movimiento se registra
+manualmente.
 
 ## Contexto de diseño (leer antes de codificar)
 
 - **`credit-cards` es un módulo propio**, no parte de accounts, por una razón estructural: sus derivados necesitan el balance (módulo movements) Y la cuenta (módulo accounts). Si viviera en accounts, accounts importaría movements _y_ movements ya importa accounts → **import circular**. Como módulo aparte, depende de ambos sin ciclo (regla 4: solo vía sus servicios públicos).
-- La deuda de la tarjeta ES su balance negativo (D1): `debt = max(0, -balance)`, `availableCredit = creditLimit + balance` (con balance ≤ 0 en operación normal). No hay columnas nuevas de deuda ni cupo — todo derivado.
+- La deuda de la tarjeta ES su balance negativo (ADR-004): `debt = max(0, -balance)`, `availableCredit = creditLimit + balance` (con balance ≤ 0 en operación normal). No hay columnas nuevas de deuda ni cupo — todo derivado.
 - Fechas de corte/pago se guardan como **día del mes** (1–31); las próximas ocurrencias se calculan con funciones puras, con clampeo a fin de mes (día 31 en abril → 30; en febrero → 28/29).
 - Los `decimals` de las monedas cripto definen la escala de unidades mínimas: BTC 8 (satoshis), ETH 8 (decisión de DATABASE.md: tracking a 8, no wei), SOL 9 (lamports), USDT 6 (nativo). Los montos siguen siendo enteros positivos — 0.5 BTC = `50000000`.
-- Comprar cripto NO requiere endpoints nuevos: es `POST /transfers` de una cuenta USD a una cuenta BTC (D3). El E2E lo verifica.
+- Comprar cripto NO requiere endpoints nuevos: es `POST /transfers` de una cuenta USD a una cuenta BTC (ADR-005). El E2E lo verifica.
 
 ## Paso 1 — Función pública nueva en movements
 
@@ -54,7 +60,7 @@ import { pgTable, uuid, bigint, integer, timestamp } from "drizzle-orm/pg-core";
 import { accounts } from "../accounts/accounts.schema.js";
 
 export const creditCardDetails = pgTable("credit_card_details", {
-  // 1:1 con accounts: el account_id ES la PK (D1).
+  // 1:1 con accounts: el account_id ES la PK (ADR-004).
   accountId: uuid("account_id")
     .primaryKey()
     .references(() => accounts.id),
@@ -216,7 +222,7 @@ Registrar en `http/server.ts`: `app.register(creditCardsRoutes, { db, requireAut
 4. GET de tarjeta sin detalles configurados → **404**.
 5. PUT válido (límite 2000000, cutDay 15, paymentDueDay 30) → 200 con `debt: 0`, `availableCredit: 2000000`, fechas próximas correctas.
 6. Registrar un expense de 350000 en la cuenta tarjeta (vía POST /movements) → GET refleja `balance: -350000`, `debt: 350000`, `availableCredit: 1650000`.
-7. Pagar la tarjeta: `POST /transfers` de la cuenta bank a la tarjeta por 350000 → GET refleja `debt: 0` (D1: pagar = transferir).
+7. Pagar la tarjeta: `POST /transfers` de la cuenta bank a la tarjeta por 350000 → GET refleja `debt: 0` (ADR-004: pagar = transferir).
 8. Segundo PUT con otro límite → 200 actualizado (upsert, no duplica).
 9. cutDay 0 o 32 → 400 (Zod).
 
@@ -228,7 +234,7 @@ Registrar en `http/server.ts`: `app.register(creditCardsRoutes, { db, requireAut
 - Columnas de deuda/cupo en la DB (derivados — principio 2).
 - `user_id` en credit_card_details (el ownership viene de la cuenta).
 - Leer `new Date()` dentro de `calc.ts` (la fecha entra como parámetro).
-- Endpoints nuevos para "comprar cripto" (es POST /transfers, D3).
+- Endpoints nuevos para "comprar cripto" (es POST /transfers, ADR-005).
 - Tratar USDT como USD.
 - Cobrar la cuota de manejo automáticamente (fuera de alcance).
 
@@ -277,5 +283,5 @@ curl -s $BASE/balances -b cookies.txt
 **NO ejecutar `git commit` ni ningún comando de git.** Al terminar:
 
 1. Marcar `Estado: ✅ completado <fecha>`, tildar los checkboxes verificados.
-2. Actualizar la tabla de orden de construcción en `docs/DATABASE.md` (fila de credit_card_details y monedas cripto → ✅ SPEC-005).
+2. Confirmar que `docs/DATABASE.md`, ADR-004 y ADR-005 reflejan el modelo implementado.
 3. Responder con: resumen, archivos creados/modificados, resultado de tests y typecheck, desviaciones justificadas, y el **mensaje de commit recomendado** (base sugerida: `feat(credit-cards): credit card details with derived metrics and crypto currencies`, con `SPEC-005` en el cuerpo). El commit lo hace el humano.

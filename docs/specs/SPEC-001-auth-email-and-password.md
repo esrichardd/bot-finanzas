@@ -2,11 +2,13 @@
 
 Estado: ✅ completado — 2026-07-30
 
-Ejecutar cumpliendo `ARCHITECTURE.md` (normativo). Este spec incluye snippets: son la implementación de referencia — seguirlos literalmente salvo que contradigan ARCHITECTURE.md, en cuyo caso ARCHITECTURE.md gana y se debe reportar la discrepancia.
+Ejecutar cumpliendo `ARCHITECTURE.md` y `backend/ARCHITECTURE.md`. Este spec
+incluye snippets que reflejan su momento de implementación; ante una
+contradicción, prevalecen las arquitecturas vigentes.
 
 ## Objetivo
 
-Autenticación email/password con Better Auth: tablas de auth en el mismo Postgres vía Drizzle, endpoints de auth montados en Fastify, un preHandler `requireAuth` reutilizable, un endpoint protegido `GET /me`, y el helper de scoping por usuario en `shared/`. Al terminar, existe el concepto de "usuario" del que dependen todos los módulos de dominio futuros.
+Autenticación email/password con Better Auth: tablas de auth en el mismo Postgres vía Drizzle, endpoints de auth montados en Fastify, un preHandler `requireAuth` reutilizable, un endpoint protegido `GET /me`, y el helper de scoping por usuario en `shared/`. Los módulos de dominio usan esta identidad y su scoping.
 
 ## Alcance
 
@@ -83,7 +85,7 @@ Better Auth define sus propias tablas (`user`, `session`, `account`, `verificati
 // tablas: nunca se conecta a la DB ni usa estos valores. Por eso son dummies
 // fijos a propósito — la generación debe ser determinista y funcionar en
 // cualquier máquina sin .env ni entorno válido. NO importar config/env.ts
-// aquí ni leer process.env (regla 6 de ARCHITECTURE.md).
+// aquí ni leer process.env (regla 5 de backend/ARCHITECTURE.md).
 import { createDb } from "../db/client.js";
 import { createAuth } from "./auth.js";
 
@@ -172,7 +174,8 @@ export async function authRoutes(
 
 Notas:
 
-- Se monta con `app.register(authRoutes, { auth })` (regla 13 de ARCHITECTURE.md) — el registro real ocurre en el Paso 6.
+- Se monta con `app.register(authRoutes, { auth })` (regla 12 de
+  `backend/ARCHITECTURE.md`) — el registro real ocurre en el Paso 6.
 - Esta ruta NO usa el type provider de Zod: el contrato de estos endpoints lo define Better Auth, no nosotros. Es la excepción documentada a la regla 11.
 - No agregar try/catch aquí: los errores los maneja el error handler global.
 
@@ -307,9 +310,9 @@ export async function usersRoutes(
 }
 ```
 
-Este módulo es la plantilla de referencia de "ruta protegida" para todos los módulos futuros.
+Este módulo es la plantilla de referencia de ruta protegida para los demás módulos.
 
-**Ownership (importante):** las tablas `user`/`session`/`account`/`verification` las posee `infra/auth/` (las genera Better Auth); el módulo `users` NO las escribe ni les agrega columnas. La identidad se lee vía `request.user`. Las tablas de dominio sobre el usuario (ej. `user_preferences`, futuras) sí serán propiedad de este módulo, relacionadas por `userId`. No crear ninguna tabla ni archivo adicional en este spec: el módulo nace solo con sus rutas.
+**Ownership (importante):** las tablas `user`/`session`/`account`/`verification` las posee `infra/auth/` (las genera Better Auth); el módulo `users` NO las escribe ni les agrega columnas. La identidad se lee vía `request.user`. Este spec no crea tablas adicionales para `users`.
 
 ## Paso 8 — Helper de scoping en `shared/`
 
@@ -322,7 +325,7 @@ import { NotFoundError } from "./errors.js";
 
 /**
  * Combina la condición de ownership con condiciones extra.
- * TODA query a datos de negocio debe usarlo (regla 9 de ARCHITECTURE.md).
+ * TODA query a datos de negocio debe usarlo (regla 8 de backend/ARCHITECTURE.md).
  * Uso: db.select().from(accounts).where(ownedBy(accounts.userId, userId, eq(accounts.id, id)))
  */
 export function ownedBy(

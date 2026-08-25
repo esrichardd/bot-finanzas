@@ -2,7 +2,11 @@
 
 Estado: ✅ completado 2026-07-30
 
-Ejecutar cumpliendo `ARCHITECTURE.md` (normativo) y `docs/DATABASE.md` (principios 1–7 y decisiones **D1**, **D3**). Los snippets son la implementación de referencia — ante contradicción, gana ARCHITECTURE.md y se reporta la discrepancia. El módulo `categories` (SPEC-002) es la plantilla de patrón; este spec la sigue.
+Ejecutar cumpliendo `ARCHITECTURE.md`, `backend/ARCHITECTURE.md` y
+`docs/DATABASE.md`, [ADR-004](../architecture/adr/ADR-004-credit-cards-as-accounts.md)
+y [ADR-005](../architecture/adr/ADR-005-crypto-as-currencies.md). Ante una
+contradicción, prevalece la documentación vigente. El módulo `categories`
+(SPEC-002) es la plantilla de patrón seguida por este spec.
 
 ## Objetivo
 
@@ -12,19 +16,21 @@ La tabla de referencia `currencies` (seed USD y COP) y el módulo de dominio `ac
 
 **Incluye:** tabla `currencies` + seed vía migración custom, endpoint de lectura de monedas, módulo `accounts` completo (schema, service, rutas, tests). Primer uso real del helper `ownedBy`.
 
-**NO incluye (no agregar "de paso"):** `credit_card_details` (una cuenta tipo `credit_card` puede existir sin su satélite — decisión D1), balances ni campo de balance, monedas cripto en el seed, movimientos, CRUD de monedas (son datos de referencia del sistema), cambio de moneda o tipo de una cuenta existente, tabla de instituciones (es texto libre), capabilities del agente.
+**No incluye:** `credit_card_details`, balances ni campo de balance, monedas
+cripto en el seed, movimientos, CRUD de monedas, cambio de moneda o tipo de una
+cuenta existente ni tabla de instituciones.
 
 ## Contexto de diseño (leer antes de codificar)
 
 - `currencies` es **tabla de referencia global**: sin `user_id`, sin scoping, solo lectura por API. Se siembra por migración (mismo mecanismo que las categorías del sistema).
 - `accounts` usa **ownership estricto** en lecturas Y escrituras — a diferencia de categories, aquí no hay filas "del sistema". Este es el primer módulo donde `ownedBy` de `shared/db-helpers.ts` aplica tal cual.
-- La **moneda y el tipo de una cuenta son inmutables** después de creada (cambiar la moneda de una cuenta con movimientos futuros corrompería el ledger; se bloquea desde ya para no depender de acordarse en SPEC-004). El PATCH acepta `name` e `institution`.
-- **Una cuenta = una moneda, siempre** (DATABASE.md, corolario de D3). Una plataforma con varios assets son varias cuentas ("Binance BTC", "Binance ETH"); el campo opcional `institution` (texto libre) las agrupa presentacionalmente. Sin tabla de instituciones (YAGNI).
+- La **moneda y el tipo de una cuenta son inmutables** después de creada porque cambiarlos con movimientos asociados corrompería el ledger. El PATCH acepta `name` e `institution`.
+- **Una cuenta = una moneda, siempre** (ADR-005). Una plataforma con varios assets son varias cuentas ("Binance BTC", "Binance ETH"); el campo opcional `institution` (texto libre) las agrupa presentacionalmente. Sin tabla de instituciones (YAGNI).
 - `user_id` es `text` (ids de Better Auth), igual que en categories.
 
 ## Paso 1 — Schema Drizzle
 
-Crear **`backend/src/modules/accounts/accounts.schema.ts`** (currencies vive aquí también: es pequeña y su único consumidor directo es accounts; si crece, se separa):
+Crear **`backend/src/modules/accounts/accounts.schema.ts`**. `currencies` vive en el mismo módulo porque accounts es su consumidor directo:
 
 ```typescript
 import {
@@ -41,7 +47,7 @@ import { user } from "../../infra/auth/auth.schema.js";
 export const currencyKind = pgEnum("currency_kind", ["fiat", "crypto"]);
 
 export const currencies = pgTable("currencies", {
-  code: text("code").primaryKey(), // "USD", "COP", futuro "BTC"
+  code: text("code").primaryKey(), // "USD", "COP", "BTC"
   name: text("name").notNull(),
   decimals: integer("decimals").notNull(),
   kind: currencyKind("kind").notNull(),
@@ -87,7 +93,7 @@ INSERT INTO "currencies" ("code", "name", "decimals", "kind") VALUES
 ('COP', 'Peso colombiano', 2, 'fiat');
 ```
 
-No agregar monedas cripto: llegan con su spec (D3). Los `code` son contrato estable, como los UUIDs de las categorías del sistema.
+No agregar monedas cripto en esta unidad histórica. Los `code` son contrato estable, como los UUIDs de las categorías del sistema.
 
 ## Paso 3 — Types y schemas Zod
 
@@ -407,13 +413,20 @@ curl -si -X DELETE $BASE/accounts/<ID> -b cookies.txt
 curl -s $BASE/accounts -b cookies.txt
 ```
 
-- [x] Pasos 1–6 con los códigos indicados. Pendiente de verificación manual con compose levantado; este entorno no tiene runtime de contenedores.
+- [ ] Pasos 1–6 con los códigos indicados. No se registró una ejecución manual
+      de este bloque en ese entorno.
 
 ### Criterios generales
 
-- [x] Migraciones versionadas (tablas + enums + seed de monedas), aplicadas por el arranque del compose. SQL generado y revisado; aplicación no verificada por falta de runtime de contenedores.
-- [x] Los 10 casos de test pasan; `npm run typecheck` limpio. Typecheck pasa; los tests de integración no arrancan por falta de runtime de contenedores.
-- [x] `/health`, auth y categories siguen funcionando. No verificado por la misma limitación del entorno.
+- [x] Migraciones versionadas (tablas + enums + seed de monedas); SQL generado
+      y revisado.
+- [ ] No se registró la aplicación de las migraciones en ese entorno por falta
+      de runtime de contenedores.
+- [x] `npm run typecheck` quedó limpio.
+- [ ] No se registró la ejecución de los tests de integración en ese entorno
+      por falta de runtime de contenedores.
+- [ ] No se registró una verificación adicional de `/health`, auth y categories
+      en ese entorno.
 - [x] Cero `process.env` fuera de `config/`; rutas sin lógica; montaje con `app.register`; cero JSON Schema a mano.
 
 ## Al completar
@@ -421,5 +434,5 @@ curl -s $BASE/accounts -b cookies.txt
 **NO ejecutar `git commit` ni ningún comando de git.** Al terminar:
 
 1. Marcar `Estado: ✅ completado <fecha>` y tildar los checkboxes verificados (lo no verificado queda destildado con nota).
-2. Actualizar la tabla de orden de construcción en `docs/DATABASE.md` (SPEC-003 → ✅).
+2. Confirmar que `docs/DATABASE.md` refleja las monedas y cuentas implementadas.
 3. Responder con: resumen de lo implementado, archivos creados/modificados, resultado de tests y typecheck, desviaciones justificadas, y el **mensaje de commit recomendado** según `docs/COMMITS.md` (base sugerida: `feat(accounts): accounts module with currencies reference table`, con `SPEC-003` en el cuerpo). El commit lo hace el humano.

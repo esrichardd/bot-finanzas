@@ -3,7 +3,7 @@
 #
 # Topología de redes:
 #   internal (internal: true) → sin acceso a/desde fuera del host. Solo Postgres y quien deba hablarle.
-#   web                       → salida a internet (APIs de AI, etc.) y entrada vía Caddy cuando exista.
+#   web                       → comunicación entre backend, frontend y Caddy, con salida a internet.
 # Postgres: SOLO internal, cero puertos publicados. Backend: ambas.
 
 services:

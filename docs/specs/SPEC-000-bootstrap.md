@@ -2,7 +2,8 @@
 
 **Estado: ✅ completado — 2026-07-30**
 
-Plan de inicialización. Ejecutar cumpliendo `ARCHITECTURE.md` (documento normativo).
+Plan de inicialización. Ejecutar cumpliendo `ARCHITECTURE.md` y
+`backend/ARCHITECTURE.md`.
 
 ## Objetivo
 
@@ -12,7 +13,8 @@ Dejar el proyecto corriendo end-to-end con `docker compose up`: backend Fastify 
 
 **Incluye:** estructura base del repo, TypeScript, Fastify, Drizzle conectado a Postgres, config validada, error handler global, logging, Docker (dev y prod), una migración inicial vacía, test del health check.
 
-**NO incluye (specs futuros):** módulos de dominio, agente/AI, WhatsApp, auth, backups a storage externo, Sentry, Caddy, frontend. No agregar nada de esto "de paso".
+**Fuera del alcance de este bootstrap:** módulos de dominio, auth, backups
+externos, Caddy y frontend. Esas piezas se implementaron en specs separados.
 
 ## Stack a instalar
 
@@ -28,7 +30,7 @@ Layout monorepo: **la raíz orquesta (compose, env, docs), cada app es autoconte
 ```
 finanzas-personales-con-ia/
   ARCHITECTURE.md
-  CLAUDE.md                   # instrucciones para AI: "lee y cumple ARCHITECTURE.md"
+  CLAUDE.md                   # instrucciones para herramientas de desarrollo
   docker-compose.yml          # dev: postgres + backend con hot reload
   docker-compose.prod.yml     # prod: build de imagen, restart policy, healthcheck
   .env.example                # TODAS las vars del sistema; el compose las inyecta a los servicios; .env en .gitignore
@@ -53,7 +55,7 @@ finanzas-personales-con-ia/
       infra/
         db/
           client.ts           # cliente Drizzle (postgres-js), pool
-          schema.ts           # schema raíz (vacío por ahora, re-exporta schemas de módulos futuros)
+          schema.ts           # schema raíz, reexporta schemas de módulos
           migrations/         # generadas por drizzle-kit
       modules/
         health/
@@ -62,9 +64,10 @@ finanzas-personales-con-ia/
           health.test.ts      # integration test contra Postgres real (Testcontainers)
 ```
 
-`frontend/` (Next.js) se agregará después con su propio Dockerfile; no crear nada de eso ahora.
+Este spec se limita al backend y no modifica `frontend/`.
 
-Nota: health se implementa como módulo estándar aunque sea trivial — sirve de plantilla de referencia del patrón `routes → service` para todos los módulos futuros.
+Nota: health se implementa como módulo estándar aunque sea trivial y sirve de
+referencia del patrón `routes → service` usado por los demás módulos.
 
 ## Variables de entorno (`.env.example`)
 

@@ -2,7 +2,9 @@
 
 Estado: ✅ completado — 2026-08-06
 
-Ejecutar cumpliendo `ARCHITECTURE.md` y `frontend/ARCHITECTURE.md`. Ambos documentos son normativos. Este spec toca backend y frontend porque el saldo inicial debe crearse de forma atómica con la cuenta: no se permite resolver esa garantía con dos escrituras independientes desde el navegador ni desde una Server Action.
+Ejecutar cumpliendo `ARCHITECTURE.md`, `backend/ARCHITECTURE.md` y
+`frontend/ARCHITECTURE.md`. Este spec toca ambas aplicaciones porque el saldo
+inicial debe crearse de forma atómica con la cuenta.
 
 Este documento es deliberadamente explícito. Los snippets muestran la intención y la estructura esperadas; deben adaptarse sólo cuando los tipos exactos de la versión instalada lo exijan. Antes de escribir código Next.js, leer las guías relevantes incluidas en `frontend/node_modules/next/dist/docs/`, como exige `frontend/AGENTS.md` (en particular formularios, Server Actions, manejo de errores y revalidación). No sustituir los patrones de este spec por librerías o arquitecturas distintas.
 
@@ -31,8 +33,6 @@ Aunque `credit_card` siga siendo un valor válido de `accounts.type` en la API y
 - mostrar cupo, deuda, corte, fecha de pago ni cuota de manejo;
 - enlazar a la configuración de tarjetas;
 - contener condicionales visuales propios de tarjetas.
-
-La navegación existente conserva `/credit-cards`. Un spec posterior implementará allí toda la experiencia de tarjetas. El backend genérico de cuentas puede seguir aceptando `credit_card` para que esa futura pantalla reutilice los servicios de dominio.
 
 En este spec, la pantalla `/accounts` muestra los tipos:
 
@@ -70,7 +70,8 @@ El movimiento inicial usa:
 - `description: "Saldo inicial"`;
 - `occurredAt`: fecha elegida por el usuario.
 
-Los futuros reportes de ingresos/gastos deben excluir ajustes, por lo que este movimiento NO se registra como `income`.
+Los ajustes son distintos de ingresos y gastos, por lo que este movimiento NO
+se registra como `income`.
 
 ### 4. La creación es atómica
 

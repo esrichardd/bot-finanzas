@@ -2,25 +2,32 @@
 
 Estado: ✅ completado 2026-07-30
 
-Ejecutar cumpliendo `ARCHITECTURE.md` (normativo) y `docs/DATABASE.md` (principios 1–7 y decisiones **D2**, **D5**). Los snippets son la implementación de referencia — ante contradicción, gana ARCHITECTURE.md y se reporta la discrepancia. Este es el spec más denso del proyecto: contiene la primera lógica de negocio real, las primeras funciones puras de dinero y las primeras transacciones de DB. Leer completo antes de escribir código.
+Ejecutar cumpliendo `ARCHITECTURE.md`, `backend/ARCHITECTURE.md` y
+`docs/DATABASE.md`, [ADR-003](../architecture/adr/ADR-003-transfers-as-ledger-groups.md)
+y [ADR-007](../architecture/adr/ADR-007-pragmatic-double-entry.md). Ante una
+contradicción, prevalece la documentación vigente. Este spec contiene la
+primera lógica de negocio, funciones puras de dinero y transacciones de DB.
 
 ## Objetivo
 
-El ledger: registrar ingresos, gastos y ajustes en cuentas; transferencias entre cuentas (misma o distinta moneda) con comisión, creadas atómicamente como grupo de movimientos (D2); balances derivados por cuenta; listado con filtros. Al cerrar este spec, la aplicación de finanzas es funcional vía API.
+El ledger: registrar ingresos, gastos y ajustes en cuentas; transferencias entre cuentas (misma o distinta moneda) con comisión, creadas atómicamente como grupo de movimientos (ADR-003); balances derivados por cuenta; listado con filtros. Al cerrar este spec, la aplicación de finanzas es funcional vía API.
 
 ## Alcance
 
 **Incluye:** tablas `movements` + `transfers`, funciones puras de cálculo (con unit tests), servicios con transacciones de DB, endpoints (crear/listar/editar/eliminar movimientos, crear/eliminar transferencias, balances), funciones públicas nuevas en los servicios de accounts y categories para validación cross-módulo, tests de integración.
 
-**NO incluye (no agregar "de paso"):** capabilities del agente, reportes/agregados por categoría o período (spec futuro), edición de transferencias (se eliminan y recrean), recurrencia de movimientos, adjuntos/recibos, paginación con cursor (offset simple basta), campo de referencia a conversación del agente (llega con el spec del agente como columna nullable).
+**No incluye:** reportes agregados por categoría o período, edición de
+transferencias, recurrencia, adjuntos/recibos ni paginación con cursor.
 
 ## Contexto de diseño (leer antes de codificar)
 
 - **Signo por tipo** (principio 3): montos siempre positivos (`bigint`), el `type` da el signo. Positivos: `income`, `transfer_in`, `adjustment_in`. Negativos: `expense`, `transfer_out`, `adjustment_out`. El balance de una cuenta = suma de montos con signo.
-- **Transferencia = grupo atómico** (D2): fila en `transfers` + movimiento `transfer_out` en la cuenta origen + `transfer_in` en la destino + opcionalmente la comisión como movimiento `expense` en la cuenta origen (categoría "Comisiones" del sistema por defecto: `00000000-0000-4000-8000-000000000010`). Todos enlazados por `transfer_id`, creados en **una transacción de DB**: o entra todo o no entra nada.
+- **Transferencia = grupo atómico** (ADR-003): fila en `transfers` + movimiento `transfer_out` en la cuenta origen + `transfer_in` en la destino + opcionalmente la comisión como movimiento `expense` en la cuenta origen (categoría "Comisiones" del sistema por defecto: `00000000-0000-4000-8000-000000000010`). Todos enlazados por `transfer_id`, creados en **una transacción de DB**: o entra todo o no entra nada.
 - **FX**: se guardan ambos montos reales (salió X COP, entró Y USD). La tasa NUNCA se almacena — es derivada. Misma moneda: `amountTo` opcional (default = `amountFrom`); si se envía y difiere → 400 (la diferencia se modela como comisión). Distinta moneda: `amountTo` obligatorio.
 - **Los movimientos de una transferencia son intocables individualmente**: PATCH/DELETE sobre un movimiento con `transfer_id` → 400 con mensaje que apunte a `DELETE /transfers/:id` (elimina el grupo completo, atómico).
-- **DELETE de movimientos simples es hard delete** — el principio 6 (archivar) aplica a cuentas/categorías con historial, no a corregir un typo en el ledger propio. El agente jamás tendrá esta capability, así que el riesgo es solo humano.
+- **DELETE de movimientos simples es hard delete** — el principio 6 (archivar)
+  aplica a cuentas/categorías con historial, no a corregir una fila del ledger
+  propio mediante el endpoint autenticado.
 - **Montos en unidades mínimas** (centavos) como `number` de JS: la columna es `bigint` con `{ mode: "number" }` en Drizzle. Rango seguro hasta 2^53 (~9×10¹⁵ centavos ≈ 90 billones de pesos) — de sobra; no usar `mode: "bigint"` (rompe la serialización JSON).
 - **Validación cross-módulo por servicios públicos** (regla 4): movements NUNCA consulta las tablas `accounts` o `categories` directamente — llama funciones exportadas de esos servicios (se agregan en el Paso 1).
 - `user_id` es `text`; `occurred_at` es `date` (solo fecha, sin hora — principio 4).
@@ -447,7 +454,7 @@ En `categories.test.ts`, agregar casos para `getAccessibleCategory`:
 
 ## Errores comunes que NO cometer
 
-- Guardar la tasa de cambio (se deriva; se guardan ambos montos — D2).
+- Guardar la tasa de cambio (se deriva; se guardan ambos montos — ADR-003).
 - Crear los movimientos de una transferencia fuera de `db.transaction` (un fallo a mitad deja el ledger descuadrado).
 - Permitir `transfer_in`/`transfer_out` en POST /movements, o editar/borrar movimientos de un transfer individualmente.
 - Columna o campo de balance en cualquier tabla (principio 2).
@@ -503,5 +510,5 @@ curl -s "$BASE/movements?accountId=<COP>&type=expense&from=2026-07-01&to=2026-07
 **NO ejecutar `git commit` ni ningún comando de git.** Al terminar:
 
 1. Marcar `Estado: ✅ completado <fecha>` y tildar los checkboxes verificados.
-2. Actualizar la tabla de orden de construcción en `docs/DATABASE.md` (SPEC-004 → ✅).
+2. Confirmar que `docs/DATABASE.md`, ADR-003 y ADR-007 reflejan el ledger implementado.
 3. Responder con: resumen, archivos creados/modificados, resultado de tests y typecheck, desviaciones justificadas, y el **mensaje de commit recomendado** según `docs/COMMITS.md` (base sugerida: `feat(movements): ledger with transfers, fx and derived balances`, con `SPEC-004` en el cuerpo). El commit lo hace el humano.

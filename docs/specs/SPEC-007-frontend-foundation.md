@@ -386,7 +386,8 @@ Nota: se usa código de moneda como sufijo, NO `style: "currency"` de Intl — B
 - Tests unitarios de dinero: 6 casos pasando.
 - Smoke test de desarrollo: `/login` responde HTTP 200.
 - Se corrigieron las incompatibilidades de `better-auth 1.6.25` con URLs relativas y de `next-themes 0.4.6` con Next 16.2/React 19.
-- El QA completo con compose, registro/login real, toggles y DevTools queda pendiente de ejecución manual.
+- No se registró evidencia del QA completo con compose, registro/login real,
+  toggles y DevTools durante la ejecución de este spec.
 
 ## Al completar
 

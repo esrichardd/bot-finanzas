@@ -2,7 +2,11 @@
 
 Estado: ✅ completado — 2026-08-06
 
-Ejecutar cumpliendo `ARCHITECTURE.md`, `frontend/ARCHITECTURE.md` y la decisión **D4** de `docs/DATABASE.md`. Los tres documentos son normativos. Este spec extiende el módulo de categorías creado en SPEC-002 y construye su primera interfaz web; no crea un segundo modelo de categorías ni duplica reglas de dominio en el frontend.
+Ejecutar cumpliendo `ARCHITECTURE.md`, `backend/ARCHITECTURE.md`,
+`frontend/ARCHITECTURE.md`, `docs/DATABASE.md` y
+[ADR-006](../architecture/adr/ADR-006-single-level-category-tree.md). Este
+spec extiende el módulo de categorías y construye su interfaz web sin duplicar
+reglas de dominio en el frontend.
 
 Este documento es deliberadamente explícito porque será ejecutado por un modelo de menor capacidad. Los nombres de archivos, contratos, estados, reglas visuales y criterios de aceptación forman parte del alcance. Antes de escribir código Next.js, leer las guías relevantes incluidas en `frontend/node_modules/next/dist/docs/`, como exige `frontend/AGENTS.md`, especialmente las de formularios, Server Actions, revalidación, loading y error handling.
 
@@ -77,7 +81,8 @@ Agregar a `categories`:
 emoji: text("emoji"),
 ```
 
-No crear una tabla de iconos y no guardar nombres de iconos Lucide. El emoji se almacena como Unicode para que sea portable a web, móvil, WhatsApp y futuros reportes.
+No crear una tabla de iconos y no guardar nombres de iconos Lucide. El emoji se
+almacena directamente como Unicode.
 
 Tanto `color` como `emoji` permanecen nullable en DB y API por compatibilidad y para permitir herencia visual en subcategorías. La UI debe enviar siempre un emoji y un color para una categoría raíz nueva usando valores iniciales razonables. Para una subcategoría, el usuario puede elegir apariencia propia o heredar la del padre.
 
@@ -210,7 +215,6 @@ La pantalla debe sentirse parte del mismo producto construido en SPEC-008 y SPEC
 - iconos Lucide persistidos en DB;
 - subida de imágenes o emojis personalizados;
 - dependencias de terceros para emoji/color picker;
-- capabilities del agente.
 
 ## Contratos HTTP finales
 
@@ -368,7 +372,7 @@ No cambiar los UUIDs, nombres ni colores existentes. La categoría `Comisiones` 
 
 Actualizar `docs/DATABASE.md` sólo donde corresponda:
 
-- en D4, mencionar que las categorías pueden tener color y emoji presentacionales;
+- en la referencia de categorías, incluir color y emoji presentacionales;
 - en el diagrama, agregar `string color` y `string emoji` como campos nullable de `CATEGORIES`.
 
 ### Paso 2 — Schemas Zod y tipos
@@ -1057,7 +1061,7 @@ Requisitos:
 - anillo de foco visible y estado seleccionado claro sin depender sólo del color;
 - input hidden `name="emoji"` con el valor seleccionado;
 - no permitir entrada de texto libre en esta versión;
-- el backend no usa `z.enum`: debe seguir aceptando otros emojis válidos para futuros clientes.
+- el backend no usa `z.enum`: acepta cualquier emoji válido, no solo la paleta visible.
 
 ### Paso 18 — Selector de color
 
@@ -1339,9 +1343,9 @@ pnpm build
 
 ### QA manual obligatorio en el navegador integrado de Codex
 
-Este QA no es opcional y no puede sustituirse por tests automatizados, `curl`, inspección de código o un navegador externo. Después de que typecheck, tests, lint y builds pasen, el agente ejecutor debe levantar la aplicación y controlar **el navegador integrado de Codex** para completar todos los flujos descritos abajo.
+Este QA no es opcional y no puede sustituirse por tests automatizados, `curl`, inspección de código o un navegador externo. Después de que typecheck, tests, lint y builds pasen, el ejecutor debe levantar la aplicación y controlar **el navegador integrado de Codex** para completar todos los flujos descritos abajo.
 
-Si el agente dispone de la skill/plugin Browser, debe leer sus instrucciones y usar específicamente el binding del navegador integrado (`iab`). No sustituirlo por Chrome, Playwright standalone, Selenium ni requests HTTP para simular los flujos visuales. Las herramientas de terminal se usan sólo para levantar servicios, consultar salud/logs y corregir fallos; las acciones de usuario se realizan en la UI.
+Si el ejecutor dispone de la skill/plugin Browser, debe leer sus instrucciones y usar específicamente el binding del navegador integrado (`iab`). No sustituirlo por Chrome, Playwright standalone, Selenium ni requests HTTP para simular los flujos visuales. Las herramientas de terminal se usan sólo para levantar servicios, consultar salud/logs y corregir fallos; las acciones de usuario se realizan en la UI.
 
 #### 1. Levantar el entorno de QA
 
@@ -1540,7 +1544,7 @@ Al terminar:
 
 #### 7. Entregable del QA
 
-El agente ejecutor debe incluir en su entrega final:
+El ejecutor debe incluir en su entrega final:
 
 - URL probada;
 - usuario probado, sin repetir la contraseña en el reporte final;

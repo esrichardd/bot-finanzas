@@ -139,8 +139,6 @@ Agregar a `.env.example`:
 # DOMAIN=
 ```
 
-Nota para prod real (documentar, no aplicar aún): cuando exista dominio, `BETTER_AUTH_URL` del `.env` del VPS pasa a `https://<dominio>`.
-
 ## Paso 5 — Compose de dev: NO tocar
 
 El `docker-compose.yml` de dev queda exactamente como está (postgres + backend). El frontend en dev corre en el host: `cd frontend && pnpm dev` → `http://localhost:3001`, con la API proxeada por el rewrite del Paso 1. No agregar el frontend ni Caddy al compose de dev.

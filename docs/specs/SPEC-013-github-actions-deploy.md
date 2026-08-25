@@ -2,7 +2,8 @@
 
 **Estado: ✅ completado — 2026-08-23**
 
-Ejecutar cumpliendo `ARCHITECTURE.md` y `docs/OPERATIONS.md`.
+Ejecutar cumpliendo `ARCHITECTURE.md` y
+`docs/operations/deployment.md`.
 
 ## Objetivo
 
@@ -31,8 +32,7 @@ No incluye:
 - cambiar el repositorio a privado;
 - almacenar secretos de aplicación en GitHub;
 - rollback automático de migraciones;
-- runners autohospedados;
-- Cloudflare Tunnel.
+- runners autohospedados.
 
 ## Seguridad
 
@@ -79,5 +79,5 @@ Frontend:
 - [x] El primer deploy manual desde Actions termina correctamente.
 - [x] Un push posterior a `main` despliega automáticamente.
 - [x] UptimeRobot permanece `Up` después de la prueba.
-- [x] `docs/OPERATIONS.md` registra la activación, fecha de verificación,
+- [x] `docs/operations/deployment.md` registra la activación, fecha de verificación,
       reconstrucción completa del acceso restringido y fallback manual seguro.

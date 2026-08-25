@@ -2,7 +2,11 @@
 
 Estado: ✅ completado
 
-Ejecutar cumpliendo `ARCHITECTURE.md`, `frontend/ARCHITECTURE.md`, `docs/DATABASE.md` y los contratos terminados por SPEC-009 y SPEC-010. Todos son normativos. Este spec extiende el ledger de SPEC-004 y construye `/movements`; no reemplaza las decisiones D2/D5 ni crea una segunda fuente de verdad para balances.
+Ejecutar cumpliendo `ARCHITECTURE.md`, `backend/ARCHITECTURE.md`,
+`frontend/ARCHITECTURE.md`, `docs/DATABASE.md`,
+[ADR-003](../architecture/adr/ADR-003-transfers-as-ledger-groups.md) y los contratos terminados por
+SPEC-009 y SPEC-010. Este spec extiende el ledger y construye `/movements` sin
+crear otra fuente de verdad para balances.
 
 Este documento es deliberadamente explícito porque será ejecutado por un modelo de menor capacidad. Antes de escribir Next.js, leer completas las guías locales relevantes de `frontend/node_modules/next/dist/docs/` exigidas por `frontend/AGENTS.md`, especialmente formularios, Server Actions, revalidación, loading/error y manejo de estado cliente.
 
@@ -67,7 +71,8 @@ TRANSFER
 
 Todos comparten `transfer_id`, `occurred_at`, `source` y se insertan en una transacción DB. Las comisiones son gastos reales y usan por defecto la categoría del sistema `Comisiones` (`00000000-0000-4000-8000-000000000010`).
 
-En el historial, el grupo se muestra una sola vez. En reportes futuros, cada comisión sí cuenta como gasto.
+En el historial, el grupo se muestra una sola vez. Cada comisión permanece como
+un gasto individual para balances y consultas.
 
 ### 2. Variantes soportadas en v1
 
@@ -203,7 +208,7 @@ Al confirmar, `POST /api/transfers` vuelve a validar y calcular. Nunca confiar e
 
 ### 9. Read model lógico del ledger
 
-Conservar `GET /api/movements` como listado técnico backward-compatible. Agregar `GET /api/ledger` como read model de dominio reutilizable por web/móvil:
+Conservar `GET /api/movements` como listado técnico backward-compatible. Agregar `GET /api/ledger` como read model consumido por el frontend:
 
 - movimiento simple → una entrada;
 - transferencia → una entrada con principal, fees y totales;
@@ -257,7 +262,7 @@ En movimientos simples:
 - read model `GET /ledger` agrupado y paginado;
 - respuesta detallada de transferencia;
 - tests unitarios e integración;
-- actualización de D2 en `docs/DATABASE.md`.
+- actualización del modelo de transferencias en `docs/DATABASE.md`.
 
 #### Frontend
 
@@ -286,7 +291,6 @@ En movimientos simples:
 - categorías por tipo income/expense;
 - movimientos recurrentes;
 - adjuntos/recibos;
-- capabilities del agente;
 - reportes o dashboard financiero;
 - cursor pagination;
 - importación CSV.
@@ -1052,7 +1056,7 @@ Agregar copy natural inglés para todas. Ningún string visible o aria-label har
 17. No usar categorías archivadas en forms.
 18. No perder labels históricos de cuentas/categorías archivadas.
 19. No hacer fetch desde Client Components.
-20. No introducir reportes, recurrencia o AI “de paso”.
+20. No introducir reportes ni recurrencia fuera del alcance.
 
 ## Criterios de aceptación
 
@@ -1207,7 +1211,7 @@ Entrega final del ejecutor: matriz completa, sufijo, capturas con rutas absoluta
 ## Al completar
 
 1. Cambiar estado a `✅ completado — YYYY-MM-DD`.
-2. Actualizar D2 en `docs/DATABASE.md` indicando fees múltiples en origen/destino, sin duplicar columnas.
+2. Actualizar `docs/DATABASE.md` indicando fees múltiples en origen/destino, sin duplicar columnas.
 3. Verificar que no se generó migración.
 4. Verificar diff y que ningún fee aparezca huérfano.
 5. No completar sin QA de navegador y todas las variantes PASS.

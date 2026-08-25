@@ -1,6 +1,8 @@
 # Backend
 
-API Fastify + agente de IA del sistema. Las reglas de diseño viven en `../ARCHITECTURE.md` (normativo); este README solo cubre cómo trabajar con el código.
+API Fastify del sistema de finanzas personales. Usa Drizzle, PostgreSQL y
+Better Auth. Los límites globales viven en `../ARCHITECTURE.md` y las reglas
+específicas del backend en `ARCHITECTURE.md`.
 
 ## Correr
 
@@ -10,7 +12,7 @@ API Fastify + agente de IA del sistema. Las reglas de diseño viven en `../ARCHI
 
 ```bash
 npm install
-# descomentar DATABASE_URL en el .env de la raíz (apunta a localhost)
+# agregar DATABASE_URL=postgres://app:app@localhost:5432/app al .env de la raíz
 npm run dev
 ```
 
@@ -34,23 +36,25 @@ src/
   config/         # env vars validadas con Zod (único lugar con process.env)
   http/           # server Fastify + error handler global
   modules/        # dominios de negocio (vertical slices) — health/ es la plantilla de referencia
-  agent/          # (futuro) Agent Core, capabilities, prompts
-  channels/       # (futuro) adapters de entrada del agente (whatsapp, web)
-  infra/          # adapters de salida: db (Drizzle), ai, messaging, auth
-  jobs/           # (futuro) crons
+  infra/          # autenticación y acceso a PostgreSQL
   shared/         # errores de dominio, helpers componibles
 ```
 
-Estructura interna de cada módulo: `<nombre>.routes.ts`, `<nombre>.service.ts`, `<nombre>.schema.ts`, `<nombre>.types.ts`, `<nombre>.test.ts`. Ver ARCHITECTURE.md §2.
+Estructura interna de cada módulo: `<nombre>.routes.ts`,
+`<nombre>.service.ts`, `<nombre>.schema.ts`, `<nombre>.types.ts` y
+`<nombre>.test.ts`. Ver `backend/ARCHITECTURE.md` §3.
 
 ## Crear un feature
 
-Seguir el checklist de ARCHITECTURE.md §8. Resumen: módulo con estructura estándar → schema + migración → servicio con la lógica y errores de dominio → rutas delgadas con validación → capability si el bot lo usa → tests de servicio y capability.
+Seguir el checklist de `backend/ARCHITECTURE.md` §9: módulo de dominio, schema y
+migración cuando corresponda, servicio con lógica de negocio, rutas delgadas y
+tests unitarios o de integración.
 
 ## Reglas que más se olvidan
 
 - Toda query se scopea por `userId` (helper de scoping).
 - Cero `process.env` fuera de `config/`.
 - Rutas sin lógica de negocio; lógica de cálculo como funciones puras.
-- Nunca mockear Drizzle en tests; solo se mockean adapters de infra.
+- Nunca mockear Drizzle ni PostgreSQL; los tests persistentes usan una base real
+  efímera mediante Testcontainers.
 - Nueva env var = schema Zod en `config/env.ts` + `.env.example` de la raíz, siempre juntos.

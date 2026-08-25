@@ -1,185 +1,187 @@
 # ARCHITECTURE.md
 
-Documento normativo. Toda feature nueva (escrita por humano o por AI) DEBE seguir estas reglas.
+Documento normativo de la arquitectura global. Toda modificación, escrita por
+una persona o por una herramienta de desarrollo, DEBE respetar los límites e
+invariantes definidos aquí.
 
-## 1. Stack
+Este documento describe exclusivamente el sistema implementado en el
+repositorio y en producción.
 
-| Pieza          | Elección                                                                                                                           | Nota                                                                                                                                                                                        |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Runtime        | Node.js + TypeScript (strict)                                                                                                      | ESM. Imports relativos con extensión `.js` (regla de ESM: la ruta apunta al output). Sin path aliases; si algún día se adoptan, subpath imports nativos (`#`), nunca plugins de reescritura |
-| Framework HTTP | Fastify + `fastify-type-provider-zod`                                                                                              | Compiladores de Zod registrados en `http/server.ts`; las rutas definen schemas con Zod                                                                                                      |
-| ORM            | Drizzle                                                                                                                            | Schema en TS, migraciones con drizzle-kit                                                                                                                                                   |
-| DB             | PostgreSQL self-hosted (Docker)                                                                                                    | Solo en red interna de compose, sin puerto expuesto al host. Versión mayor pineada (`postgres:17`)                                                                                          |
-| Backups DB     | Timer `systemd` nocturno en la VPS → `pg_dump -Fc` → `rclone crypt` → Cloudflare R2                                                 | Parte del entorno, NO opcional. Retención local de 14 días, externa de 30 días, bucket lock y restore probado trimestralmente                                                                |
-| Validación     | Zod                                                                                                                                | Solo en bordes NO confiables: input HTTP, webhooks, respuestas de APIs externas, env                                                                                                        |
-| Auth           | Better Auth (librería, en el mismo Postgres)                                                                                       | Adapter en `infra/auth/`. Solo autentica HTTP/web; WhatsApp usa vinculación propia                                                                                                          |
-| WhatsApp       | WAHA / Evolution API (no oficial)                                                                                                  | Proveedor desechable, detrás de interfaz. Número dedicado, nunca personal                                                                                                                   |
-| AI             | Detrás de interfaz `AIProvider`                                                                                                    | Proveedor intercambiable                                                                                                                                                                    |
-| Jobs/Cron      | In-process (node-cron)                                                                                                             | La cola es un adapter: migrable a BullMQ si crece                                                                                                                                           |
-| Deploy         | Docker Compose en VPS: backend + frontend (Next.js) + Postgres + WhatsApp provider + Caddy; backup administrado por el host          | Ver reglas de Docker en §3.1 y el procedimiento operativo en `docs/OPERATIONS.md`                                                                                                            |
+## 1. Jerarquía documental
 
-## 2. Estilo arquitectónico
+- Todo cambio debe cumplir este documento.
+- Los cambios del backend deben cumplir además
+  `backend/ARCHITECTURE.md`.
+- Los cambios del frontend deben cumplir además
+  `frontend/ARCHITECTURE.md`.
+- `docs/DATABASE.md` describe el modelo de datos vigente.
+- `docs/architecture/adr/README.md` indexa las decisiones estructurales
+  aceptadas.
+- `docs/operations/README.md` indexa producción, despliegue, backups, monitoreo
+  y recuperación.
 
-**Modular monolith con vertical slices.** Se organiza por dominio, no por capa técnica.
+Ante un conflicto, esta arquitectura global prevalece sobre las arquitecturas
+específicas. El código y las migraciones son la fuente exacta para contratos,
+columnas y tipos ya implementados.
 
-```
-src/
-  modules/          # un directorio por dominio de negocio
-    accounts/
-    movements/
-    commissions/
-    categories/
-    conversations/  # historial del agente (es dominio, no infra)
-  agent/            # Agent Core: cerebro del bot
-    core/           # loop del LLM, orquestación
-    capabilities/   # tools expuestas al modelo
-    prompts/
-  channels/         # adapters de entrada del agente
-    whatsapp/       # webhook, resolución de usuario, normalización
-    web/            # endpoint chat para el frontend (SSE)
-  infra/            # adapters de salida
-    ai/             # implementación de AIProvider
-    messaging/      # implementación de MessagingProvider (WAHA/etc.)
-    db/             # cliente Drizzle, migraciones
-    auth/
-  jobs/             # tareas programadas (resumen semanal, etc.)
-  http/             # server Fastify, plugins, error handler global
-  shared/           # errores de dominio, tipos comunes, utils (mínimo)
-  config/           # env validado con Zod al arranque; falla rápido
+## 2. Vista general
+
+```text
+Navegador
+   |
+   v
+Cloudflare
+   |
+   v
+Caddy :80/:443
+   |----------------------|
+   |                      |
+   v                      v
+Next.js                Fastify API
+frontend               backend
+                          |
+                          v
+                    PostgreSQL 17
 ```
 
-### Estructura interna de cada módulo
+La aplicación financiera usa un único origen público. Caddy envía `/api/*` y
+`/health` al backend y el resto al frontend. PostgreSQL permanece dentro de la
+red privada de Compose.
 
-```
-modules/<nombre>/
-  <nombre>.routes.ts    # rutas Fastify: parsear, validar, llamar servicio. CERO lógica
-  <nombre>.service.ts   # casos de uso. Aquí vive la lógica de negocio
-  <nombre>.schema.ts    # schema Drizzle del módulo
-  <nombre>.types.ts     # tipos y Zod schemas
-  <nombre>.test.ts
-```
+El dominio raíz y `www` se sirven por separado desde Vercel; la aplicación de
+finanzas vive en su subdominio y se ejecuta en la VPS.
 
-**Crecimiento interno del módulo:** plano hasta que duela → si un módulo tiene varias entidades, dividir por entidad manteniendo la convención `<entidad>.<rol>.ts` (ej. `subcategories.service.ts` dentro de `categories/`) → promover a módulo propio solo cuando la entidad acumula lógica de dominio propia. Nunca subdividir por tipo técnico (`routes/`, `services/`) dentro de un módulo.
+## 3. Componentes y responsabilidades
 
-## 3. Reglas de capas
+| Componente         | Responsabilidad                                                               |
+| ------------------ | ----------------------------------------------------------------------------- |
+| Frontend Next.js   | Presentación, interacción, lecturas server-side y mutaciones mediante Actions |
+| Backend Fastify    | Autenticación, autorización, reglas de negocio y contratos HTTP               |
+| PostgreSQL         | Persistencia de autenticación y dominios financieros                          |
+| Caddy              | Terminación TLS y routing de mismo origen                                     |
+| Cloudflare         | DNS y proxy público del subdominio de la aplicación                           |
+| GitHub Actions     | Checks y despliegue automatizado del commit exacto validado                   |
+| `systemd` + R2     | Backup lógico diario, cifrado, copia externa y heartbeat                      |
+| Monitores externos | Disponibilidad pública y ausencia del job de backup                           |
 
-1. **Routes/controllers nunca contienen lógica de negocio.** Solo: validar input → llamar servicio → mapear respuesta.
-2. **Servicios usan Drizzle directamente.** NO crear repositorios con interfaces para la DB (sobre-ingeniería para este proyecto).
-3. **Abstraer SOLO bordes volátiles:** `AIProvider`, `MessagingProvider`, auth, cola de jobs. Todo lo demás es directo.
-4. **Un módulo nunca toca las tablas de otro módulo.** Comunicación entre módulos = llamar al servicio público del otro.
-5. **Errores:** errores de dominio tipados (`NotFoundError`, `ValidationError`, `InsufficientFundsError`...) lanzados desde servicios; un error handler global en `http/` los traduce a HTTP. Nunca `try/catch` con respuestas ad-hoc en rutas.
-6. **Config:** todas las env vars se validan con Zod en `config/` al arranque. Ningún `process.env` fuera de ahí.
-7. **Logging estructurado** (pino, incluido en Fastify). Nunca `console.log`.
-8. **Prohibido `BaseService` / herencia genérica CRUD.** Los servicios expresan casos de uso con nombres de negocio (`registerMovement`, `settleCommission`), no verbos HTTP genéricos. Lo repetitivo se resuelve con **helpers componibles** en `shared/db-helpers.ts` (`findOrThrow`, paginación, scoping), que los servicios usan — nunca clases de las que heredan.
-9. **Toda query se scopea por usuario.** Cada consulta a datos de negocio filtra por `userId` usando el helper de scoping. Nunca un `where` por id sin ownership.
-10. **La lógica de cálculo se escribe como funciones puras** (datos entran, resultado sale, sin DB); el servicio las orquesta. Esto es un requisito de diseño para testabilidad, no una preferencia.
-11. **Rutas con `fastify-type-provider-zod`:** un solo schema Zod por respuesta (usar `z.literal` para pares estado/código imposibles de cruzar). Prohibido escribir JSON Schema a mano duplicando un schema Zod.
-12. **Zod solo valida bordes no confiables** (input HTTP, webhooks, APIs externas, env). Nunca `parse()` sobre salidas del propio código: eso lo garantiza TypeScript.
-13. **Los módulos HTTP se montan con `app.register(xRoutes, { deps })`.** Dependencias vía el objeto `opts`; nunca invocar la función de rutas directamente (rompe la cola de arranque y la encapsulación de Fastify).
-14. **Graceful shutdown:** el entrypoint (`index.ts`) maneja `SIGTERM`/`SIGINT` con `app.close()`. Todo recurso (pool de DB, clientes) se libera vía hooks `onClose`, nunca con cierres sueltos.
+### Límites
 
-### 3.1 Reglas de Docker/Compose
+- El frontend nunca accede directamente a PostgreSQL.
+- El navegador nunca llama a puertos internos del backend o del frontend.
+- Caddy es la única entrada HTTP/HTTPS publicada por Compose.
+- Las reglas financieras y de autorización pertenecen al backend.
+- El frontend consume contratos HTTP mediante su cliente tipado.
+- Los scripts del host operan despliegues y backups, pero no contienen lógica
+  de negocio.
 
-- Los compose **interpolan credenciales desde el `.env` de la raíz**: `${VAR:?}` en prod (falla si falta), `${VAR:-default}` en dev. Prohibido hardcodear valores duplicados en el YAML.
-- **Topología de dos redes en prod:** `internal` (con `internal: true`) para Postgres, que vive SOLO ahí sin puertos publicados; `web` para servicios que necesitan salida a internet o entrada vía Caddy. El backend está en ambas.
-- La topología (hostnames de servicios como `postgres`) vive en el compose, no en el `.env`; en el `.env` viven las credenciales.
+## 4. Flujos principales
 
-## 4. El agente (bot)
+### Lectura y escritura web
 
-El bot es un subsistema central, independiente del canal.
+1. El navegador solicita una ruta al mismo origen público.
+2. Caddy enruta páginas hacia Next.js y `/api/*` hacia Fastify.
+3. Next.js reenvía la cookie de sesión cuando consulta la API desde el servidor.
+4. Fastify valida sesión, input y ownership antes de acceder a PostgreSQL.
+5. Las respuestas vuelven por Caddy bajo el mismo dominio.
 
-### Agent Core
+### Autenticación
 
-- Contrato de entrada: `{ userId, conversationId, content: MessageContent[] }` donde `MessageContent = texto | imagen | audio`. Nunca un string plano (prepara multimodal).
-- No sabe si el mensaje vino de WhatsApp, web o un cron. Devuelve la respuesta del agente.
-- El historial de conversación se persiste en DB (`modules/conversations`), nunca en memoria.
+- Better Auth se ejecuta en el backend y persiste usuarios y sesiones en el
+  mismo PostgreSQL de la aplicación.
+- La cookie viaja bajo el mismo origen utilizado por frontend y API.
+- El proxy de Next.js realiza una redirección temprana de rutas privadas; el
+  backend conserva la validación autoritativa en cada request.
 
-### Channel adapters (`channels/`)
+### Datos financieros
 
-- WhatsApp: recibe webhook → responde 200 inmediato → procesa async. Resuelve teléfono → userId. Descarga media. Normaliza al contrato del Core. Formatea la respuesta de vuelta.
-- Web: endpoint HTTP con streaming (SSE) que llama al mismo Core.
-- Los adapters también soportan **envío saliente iniciado por el sistema** (resúmenes proactivos).
+- Las cuentas, categorías, movimientos, transferencias y tarjetas pertenecen a
+  módulos del backend.
+- Los balances se derivan del ledger y nunca se persisten como una cifra
+  mutable en `accounts`.
+- Las transferencias agrupan movimientos de salida, entrada y comisiones dentro
+  de una operación atómica.
+- Los detalles completos del modelo viven en `docs/DATABASE.md`.
 
-### Capabilities (tools del modelo)
+## 5. Invariantes globales
 
-- El AI **nunca** llama servicios de dominio directamente. Solo capabilities.
-- Cada capability: nombre, descripción, Zod schema de parámetros (genera la definición del tool), y ejecución que envuelve el servicio de dominio con restricciones propias.
-- **El AI nunca recibe ni elige `userId`**: se inyecta desde el contexto de la conversación.
-- Capabilities de escritura declaran su modo: `direct` o `requires_confirmation`, según riesgo.
-- Todo dato creado por el agente se marca con `source: 'agent'` + referencia a la conversación (auditoría).
+1. **Dinero exacto:** los montos se representan como enteros en unidades
+   mínimas; no se usan floats para persistencia o reglas financieras.
+2. **Balances derivados:** el ledger es la fuente de verdad de los saldos.
+3. **Aislamiento por usuario:** toda lectura o escritura privada valida
+   ownership en el backend.
+4. **Backend autoritativo:** el frontend no duplica reglas financieras,
+   permisos ni invariantes persistentes.
+5. **Contratos explícitos:** los bordes HTTP y la configuración se validan; el
+   cliente frontend mantiene tipos compatibles con la API.
+6. **Mismo origen:** autenticación y API funcionan sin CORS mediante el routing
+   de Next.js en desarrollo y Caddy en producción.
+7. **Base de datos privada:** PostgreSQL no publica un puerto en producción.
+8. **Secretos fuera de Git:** credenciales, llaves, Ping URLs y `.env` de
+   producción no se versionan ni se incluyen en documentación.
+9. **Cambios recuperables:** una modificación de persistencia usa migraciones
+   nuevas y un despliegue crea un backup validado antes de reconstruir.
 
-### Proactividad
+## 6. Runtime y topología de producción
 
-- `jobs/` contiene los crons (ej. resumen semanal). Un job invoca el Agent Core con un system prompt específico y empuja el resultado por el canal preferido del usuario (módulo de preferencias de notificación).
+Producción usa Docker Compose sobre una VPS ARM64:
 
-## 5. Reglas para el proveedor de WhatsApp
+- `postgres` vive únicamente en la red `internal`.
+- `backend` participa en `internal` y `web`.
+- `frontend` y `caddy` participan en `web`.
+- Solo Caddy publica los puertos `80` y `443`.
+- Los servicios se comunican mediante sus nombres de Compose.
+- El `.env` almacena configuración y credenciales; no redefine la topología de
+  red.
 
-- Es infraestructura desechable. **Ningún código fuera de `infra/messaging/` y `channels/whatsapp/` puede importar o conocer su API.**
-- Cambiar de proveedor (WAHA → Evolution → Meta Cloud API) solo debe tocar `infra/messaging/`.
-- El bot usa un número dedicado, nunca el personal.
-- **El número de teléfono NO es identidad confiable.** El vínculo teléfono → `userId` se crea solo por flujo de verificación explícito (código generado en la web autenticada, enviado al bot). Mensajes de números no vinculados: rechazar, nunca crear usuarios ni exponer datos.
+El stack actual es Node.js 22, TypeScript strict, Fastify, Drizzle,
+PostgreSQL 17, Better Auth, Next.js 16, React 19 y Caddy 2. Las versiones y
+reglas internas se detallan en las arquitecturas de backend y frontend.
 
-## 6. Testing
+## 7. Entrega, respaldo y observabilidad
 
-Herramienta: **Vitest**. Criterio: proteger la lógica que puede costar dinero o datos, no perseguir cobertura.
+- GitHub Actions ejecuta los checks de backend y frontend.
+- Un cambio elegible en `main` solicita a la VPS desplegar el SHA exacto.
+- La llave de CI está restringida a un único script y no abre una shell general.
+- El script rechaza downgrades y divergencias, crea un backup y avanza mediante
+  fast-forward.
+- El backend expone `/health`, que incluye la conectividad con PostgreSQL.
+- UptimeRobot comprueba públicamente `/health`.
+- El backup diario usa `pg_dump -Fc`, valida el dump, cifra la copia con
+  `rclone crypt`, la envía a Cloudflare R2 y notifica a Healthchecks.io.
 
-Tres niveles:
+Los comandos, retenciones, verificaciones y procedimientos de restauración
+están en `docs/operations/`.
 
-1. **Unit tests puros** — funciones de cálculo (comisiones, saldos, categorización). Sin mocks, sin DB. Son posibles porque la regla 10 obliga a escribir el cálculo como función pura.
-2. **Integration tests de servicios — contra Postgres real** (Testcontainers o contenedor de test en compose, migraciones Drizzle aplicadas por suite). Cubren los procesos relevantes: "crear movimiento actualiza saldo", "no se puede eliminar cuenta con movimientos", etc.
-3. **Tests de capabilities — sin el LLM.** Cada capability se testea como función determinista: validación del schema, restricciones (montos, modo confirmación), inyección forzada del `userId`. El comportamiento del modelo NO se testea aquí (eso sería un sistema de evals aparte).
+## 8. Quality gates
 
-Reglas:
+Antes de integrar un cambio se ejecutan los checks del área afectada:
 
-- **Nunca mockear Drizzle/el ORM.** Los tests de servicios van contra Postgres real.
-- **Solo se mockean los adapters de infra** (`AIProvider`, `MessagingProvider`): son el borde volátil.
-- Se testean servicios y capabilities, no rutas (las rutas son delgadas por la regla 1).
+- Backend: tests, typecheck y build.
+- Frontend: tests, lint y build.
+- Contratos compartidos: checks de ambas aplicaciones.
+- Compose o despliegue: validación de configuración y healthchecks indicados en
+  `docs/operations/`.
 
-## 7. Observabilidad y límites
+Los tests persistentes del backend usan PostgreSQL real mediante
+Testcontainers. El detalle pertenece a `backend/ARCHITECTURE.md`.
 
-Normativo para el código. Lo operacional (proveedores de uptime, configuración de alertas, runbooks) vive en `docs/OPERATIONS.md`.
+## 9. Ruta documental por tipo de cambio
 
-### Salud y errores
+| Cambio                                | Documentos obligatorios                              |
+| ------------------------------------- | ---------------------------------------------------- |
+| Backend, API o autenticación          | Raíz + `backend/ARCHITECTURE.md`                     |
+| Frontend o experiencia web            | Raíz + `frontend/ARCHITECTURE.md`                    |
+| Contrato usado por backend y frontend | Las tres arquitecturas                               |
+| Schema, migración o regla del ledger  | Raíz + backend + `docs/DATABASE.md`                  |
+| Compose, VPS, CI, backup o monitoreo  | Raíz + runbook correspondiente en `docs/operations/` |
 
-- El backend expone `/health`, que verifica sus dependencias: conexión a DB (con timeout de 2s; el check captura errores y responde 503, nunca lanza ni cuelga) y estado de la sesión del proveedor de WhatsApp. Es el healthcheck de Docker Compose y del monitor externo de uptime.
-- **Errores inesperados** se reportan a error tracking (Sentry) desde el error handler global. **Errores de dominio esperados** (`NotFoundError`, etc.) NO se reportan: son flujo normal.
-- Todo **job crítico** (backup, resumen semanal) reporta un heartbeat al terminar (ping a healthchecks.io o equivalente). La alerta es por **ausencia** de heartbeat, no por presencia de error.
+## 10. Anti-patrones entre componentes
 
-### Control de daños del agente
-
-- Toda capability de escritura declara sus **límites duros**: máximo de escrituras por conversación y por hora, y monto máximo en modo `direct` (por encima → `requires_confirmation`).
-- **Capabilities destructivas (delete/hard update) no se exponen al AI.** Eliminar es acción humana vía API REST.
-- El loop del Agent Core tiene **presupuesto por conversación**: máximo de llamadas al LLM y de ejecuciones de tools por mensaje entrante (corta loops infinitos). Al agotarse, responde con error amable, nunca sigue.
-- El consumo de tokens/llamadas del LLM se registra por conversación (tracking de costo).
-
-### Métricas de producto
-
-- No se monta stack de métricas. Los datos están en Postgres: cualquier métrica de producto es un query (o una pregunta al propio bot).
-
-## 8. Checklist para crear una feature nueva
-
-1. ¿Es un dominio nuevo? → crear `modules/<nombre>/` con la estructura estándar.
-2. Definir schema Drizzle + migración.
-3. Escribir el servicio con la lógica y sus errores de dominio.
-4. Exponer rutas Fastify (delgadas, con schemas Zod vía type provider) y montarlas con `app.register(xRoutes, { deps })`.
-5. ¿El bot debe poder usarla? → crear capability que envuelve el servicio, con modo, restricciones y límites duros (sección 7). Nunca capability de delete.
-6. Tests según la sección 6: unit de las funciones puras, integration del servicio contra Postgres real, y de la capability si existe. No de las rutas.
-7. Nunca: lógica en rutas, acceso a tablas ajenas, `process.env` suelto, exponer servicios crudos al AI.
-
-## 9. Anti-patrones prohibidos
-
-- Organizar por capas globales (`/controllers`, `/services`, `/models`) — ni global ni dentro de un módulo.
-- Repositorios con interfaz para la DB.
-- `BaseService` o cualquier herencia genérica CRUD; helpers componibles en su lugar.
-- Mockear el ORM en tests.
-- Queries sin scoping por `userId`.
-- Lógica duplicada entre API REST y bot (ambos consumen los mismos servicios).
-- Estado del agente en RAM.
-- El AI eligiendo el usuario o recibiendo acceso sin restricciones.
-- Capabilities de escritura sin límites duros, o loop del agente sin presupuesto.
-- Jobs críticos sin heartbeat (fallos silenciosos).
-- Reportar errores de dominio esperados a error tracking (ruido que entierra los errores reales).
-- JSON Schema escrito a mano duplicando un schema Zod.
-- `Zod.parse()` sobre salidas del propio código.
-- Invocar funciones de rutas directamente en vez de `app.register`.
-- Credenciales hardcodeadas en los compose (siempre interpolación desde `.env`).
+- Acceso del frontend a PostgreSQL.
+- Reglas de negocio implementadas únicamente en el navegador.
+- Endpoints creados para compensar una composición puramente visual.
+- Puertos internos o PostgreSQL expuestos en producción.
+- Credenciales hardcodeadas o registradas en logs.
+- Cálculos monetarios incompatibles entre backend y frontend.
+- Un despliegue que use una rama mutable en vez de un SHA validado.
+- Duplicar aquí reglas internas que pertenecen a una arquitectura específica.

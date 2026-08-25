@@ -2,7 +2,12 @@
 
 Estado: ✅ completado — 2026-08-06
 
-Ejecutar cumpliendo `ARCHITECTURE.md`, `frontend/ARCHITECTURE.md`, `docs/DATABASE.md` —en especial D1— y los contratos completados por SPEC-009, SPEC-010 y SPEC-011. Todos son normativos. Este spec amplía el módulo `credit-cards` de SPEC-005 y construye `/credit-cards`; una tarjeta continúa siendo una cuenta del ledger, no un sistema contable paralelo.
+Ejecutar cumpliendo `ARCHITECTURE.md`, `backend/ARCHITECTURE.md`,
+`frontend/ARCHITECTURE.md`, `docs/DATABASE.md`,
+[ADR-004](../architecture/adr/ADR-004-credit-cards-as-accounts.md) y los
+contratos completados por SPEC-009, SPEC-010 y SPEC-011. Este spec amplía el
+módulo `credit-cards` y construye `/credit-cards`; una tarjeta continúa siendo
+una cuenta del ledger.
 
 Este documento es deliberadamente explícito porque será ejecutado por un modelo de menor capacidad. Antes de escribir Next.js, leer completas las guías locales relevantes de `frontend/node_modules/next/dist/docs/` exigidas por `frontend/AGENTS.md`, especialmente formularios, Server Actions, search params, revalidación, loading/error y navegación.
 
@@ -243,7 +248,7 @@ Pantalla sobria, consistente con SPEC-008–011:
 - nuevos derivados creditBalance/utilization;
 - errores estables;
 - tests de rollback, scoping, lifecycle y cálculos;
-- actualización D1 en DATABASE.md.
+- actualización del modelo de tarjetas en DATABASE.md.
 
 #### Frontend
 
@@ -256,7 +261,7 @@ Pantalla sobria, consistente con SPEC-008–011:
 - feedback, estados vacíos/incompletos;
 - i18n es/en, responsive, dark, accesibilidad;
 - QA real en navegador + consola + red + PostgreSQL;
-- teardown seguro de procesos iniciados por el agente.
+- teardown seguro de procesos iniciados por el ejecutor.
 
 ### NO incluye
 
@@ -273,7 +278,6 @@ Pantalla sobria, consistente con SPEC-008–011:
 - recompensas/puntos/cashback;
 - hard delete;
 - dashboard;
-- AI/WhatsApp.
 
 ## Contratos HTTP finales
 
@@ -827,7 +831,7 @@ Strings de params/labels/aria también localizados. `creditCards` ya tiene nav k
 17. No calcular money en componentes.
 18. No mostrar errores técnicos.
 19. No marcar QA sólo por ver UI; verificar DB/red/consola.
-20. No dejar dev servers iniciados por el agente después del QA.
+20. No dejar dev servers iniciados por el ejecutor después del QA.
 
 ## Criterios de aceptación
 
@@ -895,12 +899,12 @@ Contraseña: 123456789
 1. levantar `docker compose up -d postgres backend`;
 2. esperar health/migrations;
 3. iniciar `pnpm dev` en frontend en sesión persistente;
-4. anotar qué procesos/sesiones inició el agente;
+4. anotar qué procesos/sesiones inició el ejecutor;
 5. abrir in-app browser, login/register si falta;
 6. crear sufijo `QA-CC-<fecha-hora>`;
 7. no borrar volumen DB.
 
-Al terminar, detener sólo frontend/backend/postgres iniciados por el agente: enviar Ctrl-C a la sesión frontend y `docker compose stop backend postgres`. No usar `down -v`. Si servicios ya estaban activos antes del QA, no detenerlos; registrar esa condición.
+Al terminar, detener sólo frontend/backend/postgres iniciados por el ejecutor: enviar Ctrl-C a la sesión frontend y `docker compose stop backend postgres`. No usar `down -v`. Si servicios ya estaban activos antes del QA, no detenerlos; registrar esa condición.
 
 ### 2. Observación de consola/red
 
@@ -1160,15 +1164,15 @@ Después de evidencia:
 1. anotar ids/sufijo y estado final;
 2. conservar datos QA (no hard delete);
 3. cerrar tabs de prueba si corresponde;
-4. detener sesión frontend iniciada por agente con Ctrl-C;
-5. detener sólo servicios compose iniciados por agente, sin borrar volumes;
+4. detener sesión frontend iniciada por el ejecutor con Ctrl-C;
+5. detener sólo servicios compose iniciados por el ejecutor, sin borrar volumes;
 6. comprobar que no queda proceso `next dev` iniciado por esta ejecución;
 7. reportar explícitamente teardown realizado o por qué servicios se dejaron activos.
 
 ## Al completar
 
 1. Cambiar estado a `✅ completado — YYYY-MM-DD`.
-2. Actualizar D1 en `docs/DATABASE.md` con aggregate/lifecycle, sin duplicar schema.
+2. Actualizar `docs/DATABASE.md` con aggregate/lifecycle, sin duplicar schema.
 3. Confirmar que no se generó migración.
 4. Entregar resultados automatizados y matriz CC-QA completa.
 5. Incluir consola/red/SQL y teardown en reporte.

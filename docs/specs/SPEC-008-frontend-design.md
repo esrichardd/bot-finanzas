@@ -2,7 +2,9 @@
 
 Estado: ✅ completado — 2026-08-02
 
-Ejecutar cumpliendo `frontend/ARCHITECTURE.md`. Este spec define una **dirección de arte concreta y cerrada** — no es una invitación a diseñar: los tokens, fuentes y prohibiciones de abajo son normativos. Ante la duda estética, elegir SIEMPRE la opción más sobria.
+Ejecutar cumpliendo `ARCHITECTURE.md` y `frontend/ARCHITECTURE.md`. Este spec
+registra la dirección visual aplicada: los tokens, fuentes y prohibiciones de
+abajo forman parte de ese alcance.
 
 ## Objetivo
 
@@ -18,7 +20,7 @@ Ejecutar cumpliendo `frontend/ARCHITECTURE.md`. Este spec define una **direcció
 
 **Concepto: minimalismo editorial.** Una app financiera personal que parece una publicación bien tipografiada, no un SaaS. Se logra con: neutros cálidos, UN acento verde profundo, títulos en serif, muchísimo aire, bordes hairline, casi nada más.
 
-### Prohibiciones absolutas (los clichés del "dashboard hecho por IA")
+### Prohibiciones visuales
 
 - Gradientes violeta/azul, glassmorphism, blur decorativo, glows de neón.
 - Sombras dramáticas (`shadow-lg`+); máximo `shadow-sm` y solo en elementos flotantes (drawer, dropdown).
