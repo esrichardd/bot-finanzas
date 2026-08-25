@@ -143,6 +143,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Create placeholder environment file
+        run: cp .env.example .env
+
       - name: Validate production Compose
         env:
           POSTGRES_USER: validation
