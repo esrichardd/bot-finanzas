@@ -108,7 +108,8 @@ Revisar logs cuando un servicio no quede saludable:
 docker compose -f docker-compose.prod.yml logs --tail=200 <SERVICE_NAME>
 ```
 
-Servicios válidos actualmente: `postgres`, `backend`, `frontend` y `caddy`.
+Servicios válidos actualmente: `postgres`, `postgres-admin-proxy`, `backend`,
+`frontend` y `caddy`.
 
 ### CI y despliegue mediante GitHub Actions
 

@@ -5,7 +5,8 @@
 Este runbook documenta los monitores externos, las comprobaciones de seguridad,
 el diagnóstico del host, la gestión de secretos y la recuperación general.
 Las métricas internas y alertas de Grafana se documentan en el
-[runbook de observabilidad](observability.md).
+[runbook de observabilidad](observability.md). El acceso manual a la base se
+documenta en [acceso administrativo a PostgreSQL](database-access.md).
 
 ## 1. Monitoreo externo de disponibilidad
 
@@ -140,6 +141,8 @@ uptime
 
 - `.env` solo existe en la VPS y tiene permisos `600`.
 - Las llaves privadas SSH solo existen en los equipos administradores.
+- La contraseña de `finanzas_operator` se guarda en un gestor de secretos y no
+  reutiliza `POSTGRES_PASSWORD`.
 - Los backups se consideran sensibles porque contienen todos los datos.
 - La Ping URL de Healthchecks.io es un secreto operativo y tiene permisos
   `600` en la VPS.

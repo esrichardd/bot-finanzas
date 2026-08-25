@@ -10,6 +10,7 @@
 | [Backups y restauración](backups-and-restore.md) | Backup local y externo, R2, systemd, heartbeat y restauración |
 | [Observabilidad](observability.md) | Grafana Cloud, Alloy, métricas, alertas y prueba de notificaciones |
 | [Monitoreo y seguridad](monitoring-and-security.md) | UptimeRobot, diagnóstico, accesos, recursos, secretos y recuperación |
+| [Acceso a PostgreSQL](database-access.md) | Proxy local, operador DML, túnel SSH, DBeaver y transacciones manuales |
 
 No se guardan direcciones IP, llaves privadas, contraseñas, Ping URLs ni otros
 secretos. Los valores entre `<...>` son marcadores que deben sustituirse al
@@ -22,3 +23,4 @@ ejecutar los procedimientos.
 - Verificar o restaurar respaldos: [backups y restauración](backups-and-restore.md).
 - Revisar métricas o alertas del host: [observabilidad](observability.md).
 - Investigar una alerta o incidente: [monitoreo y seguridad](monitoring-and-security.md).
+- Consultar o corregir datos de producción: [acceso a PostgreSQL](database-access.md).

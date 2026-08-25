@@ -14,6 +14,7 @@ backend/                  # API Fastify + Drizzle + Better Auth
 frontend/                 # Next.js App Router (ver frontend/README.md)
   ARCHITECTURE.md         # reglas normativas específicas del frontend
 caddy/                    # reverse proxy HTTPS y routing de mismo origen
+postgres-admin/           # proxy PostgreSQL ligado al loopback en producción
 docs/
   architecture/adr/       # decisiones arquitectónicas aceptadas
   COMMITS.md              # convención de commits
@@ -58,8 +59,10 @@ checks de backend y frontend pasan en `main`. El procedimiento completo, junto
 con el fallback manual, vive en `docs/operations/deployment.md`.
 
 El entorno requiere `.env` con credenciales reales; Compose falla si falta una
-variable obligatoria. Caddy es el único servicio que publica puertos (`80` y
-`443`); PostgreSQL, backend y frontend permanecen dentro de las redes Docker.
+variable obligatoria. Caddy publica la entrada web (`80` y `443`); PostgreSQL,
+backend y frontend permanecen dentro de las redes Docker. Un proxy
+administrativo separado publica `15432` exclusivamente en el loopback del host
+para acceso mediante túnel SSH.
 
 `DOMAIN` controla el dominio de Caddy y por defecto es `localhost` para uso local.
 En el VPS, definir `DOMAIN=finanzas.tudominio.com` en `.env`; Caddy gestionará

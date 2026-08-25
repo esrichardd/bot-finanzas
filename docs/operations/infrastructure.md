@@ -40,18 +40,26 @@ Internet
                                   v
                               OCI VPS
                                   |
-                               Caddy
-                              /     \
+                              Caddy
+                             /     \
                        frontend   backend
+                                      |
+                                  PostgreSQL
+
+Equipo administrador -- SSH --> VPS 127.0.0.1:15432
+                                      |
+                            postgres-admin-proxy
                                       |
                                   PostgreSQL
 ```
 
 En producción:
 
-- Caddy es el único servicio que publica puertos del host (`80` y `443`).
+- Caddy publica la entrada web del host (`80` y `443`).
 - El frontend y el backend solo son accesibles a través de Caddy.
 - PostgreSQL vive únicamente en la red interna de Docker y no publica `5432`.
+- El proxy administrativo publica `15432` solo en `127.0.0.1` y se alcanza por
+  túnel SSH; no existe una regla pública para ese puerto.
 - Cloudflare usa proxy para `finanzas.esrichard.dev` y cifrado `Full (strict)`.
 - Los registros raíz y `www` de Vercel permanecen en modo `DNS only`.
 - Hay un respaldo lógico local diario de PostgreSQL con retención de 14 días.
@@ -96,8 +104,8 @@ La instancia se creó con:
 - Capacidad on-demand.
 - Fault domain elegido automáticamente por Oracle.
 
-Los contenedores utilizados por el proyecto (`node`, `postgres` y `caddy`)
-publican imágenes compatibles con ARM64.
+Los contenedores utilizados por el proyecto (`node`, `postgres`, `haproxy` y
+`caddy`) publican imágenes compatibles con ARM64.
 
 ### Red
 
@@ -117,6 +125,7 @@ No abrir públicamente:
 
 - `3000`: frontend y backend se comunican dentro de Docker.
 - `5432`: PostgreSQL debe permanecer privado.
+- `15432`: proxy administrativo ligado al loopback y usado solamente por SSH.
 
 La Security List de la subred contiene reglas públicas para `80` y `443`.
 Cloudflare actúa como proxy del dominio, mientras que el origen conserva esos

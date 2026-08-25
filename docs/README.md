@@ -23,6 +23,7 @@
 - [Observabilidad](operations/observability.md): Grafana Cloud, Alloy, métricas y alertas.
 - [Monitoreo y seguridad](operations/monitoring-and-security.md): monitores, diagnóstico, secretos y
   recuperación.
+- [Acceso a PostgreSQL](operations/database-access.md): proxy local, rol DML, DBeaver y operación segura.
 
 ## Historial
 

@@ -52,6 +52,13 @@ El dominio raíz y `www` se sirven por separado desde Vercel; la aplicación de
 finanzas vive en su subdominio y se ejecuta en la VPS.
 
 ```text
+DBeaver -- túnel SSH --> VPS 127.0.0.1:15432 --> HAProxy --> PostgreSQL
+```
+
+Este flujo administrativo no atraviesa Cloudflare ni publica PostgreSQL en
+Internet.
+
+```text
 VPS host -- métricas --> Grafana Alloy -- HTTPS saliente --> Grafana Cloud
                                                                   |
                                                                   v
@@ -60,24 +67,27 @@ VPS host -- métricas --> Grafana Alloy -- HTTPS saliente --> Grafana Cloud
 
 ## 3. Componentes y responsabilidades
 
-| Componente         | Responsabilidad                                                               |
-| ------------------ | ----------------------------------------------------------------------------- |
-| Frontend Next.js   | Presentación, interacción, lecturas server-side y mutaciones mediante Actions |
-| Backend Fastify    | Autenticación, autorización, reglas de negocio y contratos HTTP               |
-| PostgreSQL         | Persistencia de autenticación y dominios financieros                          |
-| Caddy              | Terminación TLS y routing de mismo origen                                     |
-| Cloudflare         | DNS y proxy público del subdominio de la aplicación                           |
-| GitHub Actions     | Checks y despliegue automatizado del commit exacto validado                   |
-| `systemd` + R2     | Backup lógico diario, cifrado, copia externa y heartbeat                      |
-| Grafana Alloy      | Recolección y envío saliente de métricas del host                             |
-| Grafana Cloud      | Dashboards y alertas de CPU, memoria, disco y ausencia de métricas            |
-| Monitores externos | Disponibilidad pública y ausencia del job de backup                           |
+| Componente             | Responsabilidad                                                               |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| Frontend Next.js       | Presentación, interacción, lecturas server-side y mutaciones mediante Actions |
+| Backend Fastify        | Autenticación, autorización, reglas de negocio y contratos HTTP               |
+| PostgreSQL             | Persistencia de autenticación y dominios financieros                          |
+| HAProxy administrativo | Acceso PostgreSQL ligado al loopback y alcanzable solo mediante SSH            |
+| Caddy                  | Terminación TLS y routing de mismo origen                                     |
+| Cloudflare             | DNS y proxy público del subdominio de la aplicación                           |
+| GitHub Actions         | Checks y despliegue automatizado del commit exacto validado                   |
+| `systemd` + R2         | Backup lógico diario, cifrado, copia externa y heartbeat                      |
+| Grafana Alloy          | Recolección y envío saliente de métricas del host                             |
+| Grafana Cloud          | Dashboards y alertas de CPU, memoria, disco y ausencia de métricas            |
+| Monitores externos     | Disponibilidad pública y ausencia del job de backup                           |
 
 ### Límites
 
 - El frontend nunca accede directamente a PostgreSQL.
 - El navegador nunca llama a puertos internos del backend o del frontend.
 - Caddy es la única entrada HTTP/HTTPS publicada por Compose.
+- El proxy administrativo de PostgreSQL publica `15432` solo en
+  `127.0.0.1`; nunca constituye una entrada pública.
 - Las reglas financieras y de autorización pertenecen al backend.
 - El frontend consume contratos HTTP mediante su cliente tipado.
 - Los scripts del host operan despliegues y backups, pero no contienen lógica
@@ -124,7 +134,9 @@ VPS host -- métricas --> Grafana Alloy -- HTTPS saliente --> Grafana Cloud
    cliente frontend mantiene tipos compatibles con la API.
 6. **Mismo origen:** autenticación y API funcionan sin CORS mediante el routing
    de Next.js en desarrollo y Caddy en producción.
-7. **Base de datos privada:** PostgreSQL no publica un puerto en producción.
+7. **Base de datos privada:** el contenedor PostgreSQL no publica un puerto en
+   producción; el acceso administrativo pasa por un proxy ligado al loopback y
+   un túnel SSH.
 8. **Secretos fuera de Git:** credenciales, llaves, Ping URLs y `.env` de
    producción no se versionan ni se incluyen en documentación.
 9. **Cambios recuperables:** una modificación de persistencia usa migraciones
@@ -135,6 +147,8 @@ VPS host -- métricas --> Grafana Alloy -- HTTPS saliente --> Grafana Cloud
 Producción usa Docker Compose sobre una VPS ARM64:
 
 - `postgres` vive únicamente en la red `internal`.
+- `postgres-admin-proxy` participa en `internal` y `admin`, y publica
+  `127.0.0.1:15432` para clientes conectados por SSH.
 - `backend` participa en `internal` y `web`.
 - `frontend` y `caddy` participan en `web`.
 - Solo Caddy publica los puertos `80` y `443`.
@@ -191,7 +205,7 @@ Testcontainers. El detalle pertenece a `backend/ARCHITECTURE.md`.
 - Acceso del frontend a PostgreSQL.
 - Reglas de negocio implementadas únicamente en el navegador.
 - Endpoints creados para compensar una composición puramente visual.
-- Puertos internos o PostgreSQL expuestos en producción.
+- Puertos internos o PostgreSQL expuestos públicamente en producción.
 - Credenciales hardcodeadas o registradas en logs.
 - Cálculos monetarios incompatibles entre backend y frontend.
 - Un despliegue que use una rama mutable en vez de un SHA validado.
