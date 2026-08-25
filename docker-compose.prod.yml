@@ -4,9 +4,10 @@
 # Topología de redes:
 #   internal (internal: true) → sin acceso a/desde fuera del host. Solo Postgres y quien deba hablarle.
 #   web                       → comunicación entre backend, frontend y Caddy, con salida a internet.
-# Postgres: red internal y acceso administrativo solo por loopback del host.
-# El binding 127.0.0.1:15432 no es accesible desde Internet; se usa detrás de SSH.
-# Backend: ambas redes.
+#   admin                     → permite publicar el proxy administrativo solo en el loopback del host.
+# Postgres: SOLO internal, sin puertos publicados ni salida por otra red.
+# postgres-admin-proxy: internal + admin, con binding 127.0.0.1:15432 detrás de SSH.
+# Backend: internal + web.
 
 services:
   postgres:
@@ -17,8 +18,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB requerida}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "127.0.0.1:15432:5432"
     networks:
       - internal
     restart: unless-stopped
@@ -27,6 +26,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  postgres-admin-proxy:
+    image: haproxy:3.2.22-alpine
+    user: haproxy
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:15432:15432"
+    volumes:
+      - ./postgres-admin/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    networks:
+      - internal
+      - admin
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   backend:
     build:
@@ -82,6 +101,8 @@ services:
 networks:
   internal:
     internal: true
+  admin:
+    driver: bridge
   web:
 
 volumes:

@@ -133,12 +133,38 @@ jobs:
         working-directory: frontend
         run: pnpm build
 
+  infrastructure:
+    name: Infrastructure checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Validate production Compose
+        env:
+          POSTGRES_USER: validation
+          POSTGRES_PASSWORD: validation-only
+          POSTGRES_DB: validation
+          DOMAIN: example.com
+        run: docker compose -f docker-compose.prod.yml config --quiet
+
+      - name: Validate PostgreSQL admin proxy
+        run: >-
+          docker run --rm
+          -v "${PWD}/postgres-admin/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro"
+          haproxy:3.2.22-alpine
+          haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg
+
   deploy:
     name: Deploy production
     needs:
       - changes
       - backend
       - frontend
+      - infrastructure
     if: >-
       github.ref == 'refs/heads/main' &&
       github.event_name != 'pull_request' &&
