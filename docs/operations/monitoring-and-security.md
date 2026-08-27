@@ -172,6 +172,10 @@ periódicas de Docker y UptimeRobot sin ocultar fallos.
 - Los backups se consideran sensibles porque contienen todos los datos.
 - La Ping URL de Healthchecks.io es un secreto operativo y tiene permisos
   `600` en la VPS.
+- El endpoint, instance ID y token OTLP de Grafana viven en
+  `/etc/sysconfig/alloy-otlp`, propiedad de `root` y con permisos `600`.
+- El backend solo conoce el endpoint privado de Alloy; no recibe credenciales
+  de Grafana Cloud.
 - No imprimir `docker compose config` sin `--quiet` en canales compartidos.
 - No copiar `.env` dentro de imágenes Docker ni añadirlo a Git.
 - Rotar credenciales ante cualquier sospecha de exposición.

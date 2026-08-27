@@ -29,6 +29,7 @@ decisión nueva siempre existió.
 | [ADR-011](ADR-011-grafana-cloud-host-observability.md)       | Aceptado | Observar la VPS con Grafana Cloud y Grafana Alloy      |
 | [ADR-012](ADR-012-ssh-tunneled-postgres-administration.md)   | Aceptado | Administrar PostgreSQL mediante proxy local y SSH      |
 | [ADR-013](ADR-013-centralized-container-logs.md)             | Aceptado | Centralizar logs web de Docker con Alloy y Loki        |
+| [ADR-014](ADR-014-provider-neutral-opentelemetry-tracing.md) | Aceptado | Trazar el backend con OpenTelemetry y OTLP              |
 
 La arquitectura describe cómo funciona hoy el sistema; los ADR explican por
 qué se eligieron sus decisiones más costosas de cambiar. El código y las

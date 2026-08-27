@@ -2,7 +2,8 @@
 
 [Índice de operaciones](README.md) ·
 [ADR-011: Grafana Cloud y Alloy](../architecture/adr/ADR-011-grafana-cloud-host-observability.md) ·
-[ADR-013: logs centralizados](../architecture/adr/ADR-013-centralized-container-logs.md)
+[ADR-013: logs centralizados](../architecture/adr/ADR-013-centralized-container-logs.md) ·
+[ADR-014: tracing OpenTelemetry](../architecture/adr/ADR-014-provider-neutral-opentelemetry-tracing.md)
 
 Este runbook documenta la observabilidad implementada para la VPS. No contiene
 tokens, direcciones de correo ni credenciales.
@@ -16,6 +17,9 @@ tokens, direcciones de correo ni credenciales.
 - Una configuración local de Alloy descubre los contenedores de Compose y
   envía a Grafana Cloud Loki los logs de servidor de `backend`, `frontend` y
   `caddy`. No incluye PostgreSQL, el proxy administrativo ni logs del navegador.
+- El backend instrumentado con OpenTelemetry envía trazas OTLP/HTTP al Alloy
+  del host por la red privada de Docker. Alloy las reenvía a Grafana Cloud
+  Tempo; ninguna credencial de Grafana entra al contenedor.
 - El dashboard `Linux node / overview` muestra CPU, memoria, disco y red para
   `finanzas-prod-vnic`.
 - Las reglas se evalúan cada minuto y notifican mediante el contact point
@@ -93,6 +97,43 @@ El servicio `frontend` representa el proceso Next.js en la VPS; los errores de
 la consola del navegador requieren instrumentación del cliente y no forman
 parte de este flujo.
 
+## Trazas del backend
+
+El recorrido implementado es:
+
+```text
+Fastify -> OTLP/HTTP -> host.docker.internal:4318 -> Alloy -> HTTPS -> Tempo
+```
+
+Alloy escucha únicamente en `172.17.0.1:4318`; el puerto no se publica en
+Internet. Producción define en `.env`:
+
+```dotenv
+OTEL_TRACING_ENABLED=true
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://host.docker.internal:4318/v1/traces
+OTEL_SERVICE_NAME=finanzas-backend
+OTEL_TRACE_SAMPLE_RATIO=1
+```
+
+El deploy exporta automáticamente el SHA validado como
+`OTEL_SERVICE_VERSION`. `/health` no genera spans y los valores del query
+string se sustituyen por `REDACTED`.
+
+Buscar trazas recientes en Explore con la fuente Tempo:
+
+```traceql
+{ resource.service.name = "finanzas-backend" }
+```
+
+Buscar en Loki los logs de una traza concreta:
+
+```logql
+{service_name="backend"} |= "<TRACE_ID>"
+```
+
+El flujo se verificó en producción el **2026-08-27** con una petición
+`GET /api/categories`, spans HTTP/Fastify y servicio `finanzas-backend`.
+
 ## Verificación y diagnóstico
 
 ```bash
@@ -102,10 +143,11 @@ sudo systemctl is-active alloy.service
 Comprueba si Alloy está ejecutándose; debe responder `active`.
 
 ```bash
-sudo alloy validate /etc/alloy/config.alloy
+sudo bash -c 'set -a; source /etc/sysconfig/alloy-otlp; set +a; exec alloy validate /etc/alloy/config.alloy'
 ```
 
-Valida la sintaxis de la configuración sin reiniciar el servicio.
+Carga las variables protegidas solo dentro del proceso de validación y comprueba
+la configuración sin reiniciar el servicio ni imprimir sus valores.
 
 ```bash
 sudo journalctl -u alloy.service -n 100 --no-pager
@@ -115,22 +157,54 @@ Muestra los últimos cien eventos del servicio sin abrir un paginador. Revisar
 errores de configuración, autenticación o envío remoto.
 
 ```bash
+sudo ss -lntp 'sport = :4318'
+```
+
+Confirma que el receptor OTLP pertenece a Alloy y escucha en
+`172.17.0.1:4318`, no en una interfaz pública.
+
+```bash
+docker compose -f /home/opc/finanzas/docker-compose.prod.yml logs --since=10m backend \
+  | grep -E 'OpenTelemetry tracing enabled|Tracing could not start'
+```
+
+Comprueba si el backend activó tracing o continuó sin él por un error de
+inicio. La aplicación permanece disponible aunque falle la telemetría.
+
+```bash
 sudo -u alloy docker ps --format 'table {{.Names}}\t{{.Status}}'
 ```
 
 Ejecuta la consulta como el usuario del servicio Alloy y confirma que puede
 descubrir los contenedores sin usar una sesión de `root`.
 
-Después de modificar la configuración:
+Antes de modificar la configuración:
 
 ```bash
+sudo cp --preserve=all /etc/alloy/config.alloy /etc/alloy/config.alloy.rollback
+```
+
+Conserva una copia exacta de la última configuración funcional. Después de
+editar:
+
+```bash
+sudo bash -c 'set -a; source /etc/sysconfig/alloy-otlp; set +a; exec alloy validate /etc/alloy/config.alloy'
 sudo systemctl restart alloy.service
 sudo systemctl is-active alloy.service
 ```
 
-El primer comando reinicia Alloy para aplicar el cambio; el segundo confirma
-que volvió a quedar activo. En Grafana, `Test Alloy connection` debe indicar
-que la integración está enviando datos.
+El primer comando valida con el entorno real; los dos últimos aplican el cambio
+y confirman `active`. Si falla:
+
+```bash
+sudo cp --preserve=all /etc/alloy/config.alloy.rollback /etc/alloy/config.alloy
+sudo systemctl reset-failed alloy.service
+sudo systemctl restart alloy.service
+```
+
+Estas órdenes restauran la copia, limpian el estado fallido y vuelven a iniciar
+Alloy. En Grafana, `Test Alloy connection` debe indicar que la integración está
+enviando datos.
 
 ## Prueba de notificación
 
@@ -165,6 +239,20 @@ La ruta completa se verificó el **2026-08-25** mediante una regla temporal:
    etiquetas listadas arriba y reenviar al `loki.write` creado por Grafana.
 8. Validar la configuración, reiniciar Alloy y confirmar en Explore que una
    consulta por `service_name="backend"` devuelve eventos recientes.
-9. Probar la conexión, instalar el dashboard y recrear las cuatro reglas de la
+9. Crear una credencial OTLP con permiso de escritura. Guardar endpoint,
+   instance ID y token en `/etc/sysconfig/alloy-otlp`, propiedad de `root` y
+   modo `600`, usando las variables `OTLP_ENDPOINT`, `OTLP_USERNAME` y
+   `OTLP_API_KEY`. Nunca copiar sus valores al repositorio.
+10. Añadir un drop-in de `alloy.service` que cargue ese archivo. En
+    `/etc/alloy/config.alloy`, conectar un `otelcol.receiver.otlp` HTTP ligado
+    a `172.17.0.1:4318` con memory limiter, batch y
+    `otelcol.exporter.otlphttp` autenticado. Ejecutar `systemctl daemon-reload`
+    después de crear el drop-in y validar con el archivo de entorno antes de
+    reiniciar.
+11. Confirmar el listener con `ss`, agregar al `.env` las cuatro variables no
+    secretas mostradas arriba y desplegar el backend.
+12. Ejecutar una petición real y verificar la consulta TraceQL y la
+    correlación por `trace_id` en Loki.
+13. Probar la conexión, instalar el dashboard y recrear las cuatro reglas de la
    tabla.
-10. Recrear y probar el contact point, y repetir la prueba temporal.
+14. Recrear y probar el contact point, y repetir la prueba temporal.

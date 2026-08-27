@@ -85,6 +85,7 @@ utiliza como mecanismo de rollback: se debe crear un revert nuevo en `main`.
 Validar la configuración, reconstruir los servicios y comprobar su estado:
 
 ```bash
+export OTEL_SERVICE_VERSION="$(git rev-parse HEAD)"
 docker compose -f docker-compose.prod.yml config --quiet
 docker compose -f docker-compose.prod.yml up --build -d --remove-orphans
 docker compose -f docker-compose.prod.yml ps
@@ -92,6 +93,8 @@ docker compose -f docker-compose.prod.yml exec -T backend wget -q -O- http://loc
 curl --fail-with-body --silent --show-error "https://<APP_DOMAIN>/health"
 ```
 
+- `export OTEL_SERVICE_VERSION=...` etiqueta las trazas con el SHA exacto del
+  commit desplegado; el script automático realiza este paso por sí mismo.
 - `config --quiet` valida Compose sin imprimir secretos.
 - `up --build -d --remove-orphans` reconstruye en segundo plano y retira
   contenedores de servicios que ya no existen en el archivo.

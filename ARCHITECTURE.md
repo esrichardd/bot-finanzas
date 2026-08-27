@@ -59,12 +59,12 @@ Este flujo administrativo no atraviesa Cloudflare ni publica PostgreSQL en
 Internet.
 
 ```text
-VPS host -- métricas --------------------|
-                                         v
-Docker -- logs de backend/frontend/caddy --> Grafana Alloy -- HTTPS --> Grafana Cloud
-                                                                            |
-                                                                            v
-                                                                  alertas por correo
+VPS host -- métricas -------------------------|
+Docker -- logs de backend/frontend/caddy -----|--> Grafana Alloy -- HTTPS --> Grafana Cloud
+Fastify -- trazas OTLP por red Docker privada-|
+                                                                         |
+                                                                         v
+                                                               alertas por correo
 ```
 
 ## 3. Componentes y responsabilidades
@@ -79,8 +79,8 @@ Docker -- logs de backend/frontend/caddy --> Grafana Alloy -- HTTPS --> Grafana 
 | Cloudflare             | DNS y proxy público del subdominio de la aplicación                           |
 | GitHub Actions         | Checks y despliegue automatizado del commit exacto validado                   |
 | `systemd` + R2         | Backup lógico diario, cifrado, copia externa y heartbeat                      |
-| Grafana Alloy          | Recolección y envío saliente de métricas del host y logs de servicios web     |
-| Grafana Cloud          | Dashboards, consultas de logs y alertas de recursos y telemetría              |
+| Grafana Alloy          | Recolección y envío de métricas, logs web y trazas OTLP del backend            |
+| Grafana Cloud          | Dashboards, consultas de logs y trazas, y alertas de recursos y telemetría    |
 | Monitores externos     | Disponibilidad pública y ausencia del job de backup                           |
 
 ### Límites
@@ -178,6 +178,9 @@ reglas internas se detallan en las arquitecturas de backend y frontend.
 - Alloy también descubre los contenedores de Compose y envía a Grafana Cloud
   Loki los logs de servidor de `backend`, `frontend` y `caddy`. PostgreSQL y el
   proxy administrativo quedan excluidos.
+- El backend instrumentado con OpenTelemetry envía trazas OTLP/HTTP al Alloy
+  del host por la red privada de Docker. Alloy las reenvía a Tempo y mantiene
+  fuera del contenedor las credenciales de Grafana.
 
 Los comandos, retenciones, verificaciones y procedimientos de restauración
 están en `docs/operations/`.

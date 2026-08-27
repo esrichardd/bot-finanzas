@@ -8,7 +8,7 @@
 | [Infraestructura](infrastructure.md) | Inventario actual, OCI, red, firewall, SSH, Docker, configuración inicial, DNS y HTTPS |
 | [Despliegue](deployment.md) | Despliegue manual de contingencia, GitHub Actions y reconstrucción del acceso SSH restringido |
 | [Backups y restauración](backups-and-restore.md) | Backup local y externo, R2, systemd, heartbeat y restauración |
-| [Observabilidad](observability.md) | Grafana Cloud, Alloy, métricas, logs, alertas y prueba de notificaciones |
+| [Observabilidad](observability.md) | Grafana Cloud, Alloy, métricas, logs, trazas, alertas y pruebas |
 | [Monitoreo y seguridad](monitoring-and-security.md) | UptimeRobot, diagnóstico, accesos, recursos, secretos y recuperación |
 | [Acceso a PostgreSQL](database-access.md) | Proxy local, operador DML, túnel SSH, DBeaver y transacciones manuales |
 

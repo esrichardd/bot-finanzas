@@ -20,7 +20,7 @@
 - [Infraestructura](operations/infrastructure.md): OCI, red, SSH, Docker, DNS y HTTPS.
 - [Despliegue](operations/deployment.md): automatización y contingencia manual.
 - [Backups y restauración](operations/backups-and-restore.md): copias locales, R2 y restore.
-- [Observabilidad](operations/observability.md): Grafana Cloud, Alloy, métricas, logs y alertas.
+- [Observabilidad](operations/observability.md): Grafana Cloud, Alloy, métricas, logs, trazas y alertas.
 - [Monitoreo y seguridad](operations/monitoring-and-security.md): monitores, diagnóstico, secretos y
   recuperación.
 - [Acceso a PostgreSQL](operations/database-access.md): proxy local, rol DML, DBeaver y operación segura.
