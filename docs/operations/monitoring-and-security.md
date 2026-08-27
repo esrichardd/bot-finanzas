@@ -146,6 +146,9 @@ espacio local ocupado por los contenedores:
 sudo du -sh /var/lib/docker/containers
 ```
 
+El endpoint `/health` omite los logs automáticos cuando responde correctamente
+y emite una advertencia si queda degradado, evitando ruido por las consultas
+periódicas de Docker y UptimeRobot sin ocultar fallos.
 
 ### Señales que requieren investigación
 

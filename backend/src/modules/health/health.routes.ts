@@ -21,12 +21,21 @@ export async function healthRoutes(
   app.withTypeProvider<ZodTypeProvider>().get(
     "/health",
     {
+      logLevel: "warn",
       schema: {
         response: { 200: okResponse, 503: degradedResponse },
       },
     },
-    async (_request, reply) => {
+    async (request, reply) => {
       const result = await checkHealth(opts.db);
+
+      if (result.status === "degraded") {
+        request.log.warn(
+          { checks: result.checks },
+          "Health check is degraded",
+        );
+      }
+
       return reply.code(result.status === "ok" ? 200 : 503).send(result);
     },
   );
