@@ -28,6 +28,7 @@ decisión nueva siempre existió.
 | [ADR-010](ADR-010-encrypted-offsite-postgres-backups.md)     | Aceptado | Mantener backups PostgreSQL cifrados fuera de la VPS   |
 | [ADR-011](ADR-011-grafana-cloud-host-observability.md)       | Aceptado | Observar la VPS con Grafana Cloud y Grafana Alloy      |
 | [ADR-012](ADR-012-ssh-tunneled-postgres-administration.md)   | Aceptado | Administrar PostgreSQL mediante proxy local y SSH      |
+| [ADR-013](ADR-013-centralized-container-logs.md)             | Aceptado | Centralizar logs web de Docker con Alloy y Loki        |
 
 La arquitectura describe cómo funciona hoy el sistema; los ADR explican por
 qué se eligieron sus decisiones más costosas de cambiar. El código y las

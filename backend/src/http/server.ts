@@ -27,7 +27,16 @@ export function buildServer({
   db,
   closeDb,
 }: ServerDependencies): FastifyInstance {
-  const app = Fastify({ logger: { level: env.LOG_LEVEL } });
+  const app = Fastify({
+    logger: {
+      level: env.LOG_LEVEL,
+      formatters: {
+        level(label) {
+          return { level: label };
+        },
+      },
+    },
+  });
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);

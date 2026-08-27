@@ -1,7 +1,8 @@
-# Observabilidad del host
+# Observabilidad de producción
 
 [Índice de operaciones](README.md) ·
-[ADR-011: Grafana Cloud y Alloy](../architecture/adr/ADR-011-grafana-cloud-host-observability.md)
+[ADR-011: Grafana Cloud y Alloy](../architecture/adr/ADR-011-grafana-cloud-host-observability.md) ·
+[ADR-013: logs centralizados](../architecture/adr/ADR-013-centralized-container-logs.md)
 
 Este runbook documenta la observabilidad implementada para la VPS. No contiene
 tokens, direcciones de correo ni credenciales.
@@ -11,7 +12,10 @@ tokens, direcciones de correo ni credenciales.
 - Grafana Alloy se ejecuta como `alloy.service` en la VPS ARM64.
 - Su configuración está en `/etc/alloy/config.alloy` y usa configuración remota.
 - La integración `Linux Server` envía métricas estándar del host a Grafana
-  Cloud; no envía logs ni instala alertas genéricas.
+  Cloud y no instala alertas genéricas.
+- Una configuración local de Alloy descubre los contenedores de Compose y
+  envía a Grafana Cloud Loki los logs de servidor de `backend`, `frontend` y
+  `caddy`. No incluye PostgreSQL, el proxy administrativo ni logs del navegador.
 - El dashboard `Linux node / overview` muestra CPU, memoria, disco y red para
   `finanzas-prod-vnic`.
 - Las reglas se evalúan cada minuto y notifican mediante el contact point
@@ -57,6 +61,38 @@ Todas usan las etiquetas `environment=production`, `service=vps` y un
 `resource` acorde a la regla. CPU y memoria usan `severity=warning`; disco y
 ausencia de métricas usan `severity=critical`.
 
+## Logs de servicios web
+
+Alloy lee continuamente la salida estándar de los contenedores; no usa un
+cron. Docker conserva localmente archivos rotados y Alloy envía cada línea por
+HTTPS a Loki. Los streams usan estas etiquetas estables:
+
+- `job=finanzas/docker`
+- `environment=production`
+- `compose_project=finanzas`
+- `service_name`, `instance`, `container` y `stream`
+
+El backend escribe JSON estructurado con niveles textuales como `info`, `warn`
+y `error`. Datos variables como `reqId`, método, ruta y código HTTP permanecen
+como campos JSON para poder filtrarlos sin crear etiquetas de alta cardinalidad.
+
+Consultas útiles en Grafana Explore:
+
+```logql
+{environment="production", service_name=~"backend|frontend|caddy"}
+```
+
+Muestra los logs de servidor de los tres servicios enviados a Loki.
+
+```logql
+{service_name="backend"} | json | level=~"warn|error|fatal"
+```
+
+Extrae el JSON de Fastify y muestra únicamente eventos de advertencia o error.
+El servicio `frontend` representa el proceso Next.js en la VPS; los errores de
+la consola del navegador requieren instrumentación del cliente y no forman
+parte de este flujo.
+
 ## Verificación y diagnóstico
 
 ```bash
@@ -77,6 +113,13 @@ sudo journalctl -u alloy.service -n 100 --no-pager
 
 Muestra los últimos cien eventos del servicio sin abrir un paginador. Revisar
 errores de configuración, autenticación o envío remoto.
+
+```bash
+sudo -u alloy docker ps --format 'table {{.Names}}\t{{.Status}}'
+```
+
+Ejecuta la consulta como el usuario del servicio Alloy y confirma que puede
+descubrir los contenedores sin usar una sesión de `root`.
 
 Después de modificar la configuración:
 
@@ -108,11 +151,20 @@ La ruta completa se verificó el **2026-08-25** mediante una regla temporal:
    propuestos y mantener habilitada la configuración remota. El token es un
    secreto y no debe copiarse a este repositorio.
 3. Ejecutar en la VPS el comando generado por Grafana para instalar Alloy.
-4. Configurar métricas extendidas, logs y alertas incluidas como desactivadas;
+4. Configurar métricas extendidas, logs y alertas genéricas como desactivadas;
    elegir `Simple set-up`.
 5. Aplicar el fragmento generado para `Linux Server`, validar la configuración
    y reiniciar Alloy con los comandos anteriores.
-6. Probar la conexión, instalar el dashboard y recrear las cuatro reglas de la
+6. Añadir el usuario `alloy` al grupo `docker`, reiniciar Alloy y comprobar con
+   `sudo -u alloy docker ps` que puede leer el socket local. Esta membresía
+   concede privilegios equivalentes a `root` sobre Docker y debe limitarse al
+   agente de confianza instalado en la VPS.
+7. Añadir a `/etc/alloy/config.alloy` los componentes `discovery.docker`,
+   `discovery.relabel` y `loki.source.docker`: conservar únicamente el proyecto
+   `finanzas` y los servicios `backend`, `frontend` y `caddy`, aplicar las
+   etiquetas listadas arriba y reenviar al `loki.write` creado por Grafana.
+8. Validar la configuración, reiniciar Alloy y confirmar en Explore que una
+   consulta por `service_name="backend"` devuelve eventos recientes.
+9. Probar la conexión, instalar el dashboard y recrear las cuatro reglas de la
    tabla.
-7. Recrear y probar el contact point, y repetir la prueba temporal.
-
+10. Recrear y probar el contact point, y repetir la prueba temporal.

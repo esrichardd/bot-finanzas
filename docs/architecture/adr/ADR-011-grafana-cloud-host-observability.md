@@ -13,8 +13,10 @@ o red ni detecta la pérdida de telemetría del host.
 
 Ejecutar Grafana Alloy como servicio `systemd` en la VPS y enviar por HTTPS las
 métricas estándar de la integración `Linux Server` a Grafana Cloud. Mantener
-logs y alertas genéricas desactivados y definir reglas propias para CPU,
-memoria, disco raíz y ausencia de métricas, con notificación por correo.
+los logs y las alertas genéricas de esa integración desactivados y definir
+reglas propias para CPU, memoria, disco raíz y ausencia de métricas, con
+notificación por correo. El flujo específico de logs de Docker se decide por
+separado en el ADR-013.
 
 ## Consecuencias
 
@@ -29,4 +31,3 @@ memoria, disco raíz y ausencia de métricas, con notificación por correo.
 - `docs/operations/observability.md`
 - `docs/operations/monitoring-and-security.md`
 - `ARCHITECTURE.md`
-
