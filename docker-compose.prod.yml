@@ -57,11 +57,16 @@ services:
   backend:
     build:
       context: ./backend
+    extra_hosts:
+      # Nombre estable para que el contenedor pueda enviar OTLP al Alloy del host.
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     environment:
       NODE_ENV: production
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # El deploy exporta el SHA exacto; el fallback mantiene Compose validable fuera de CI.
+      OTEL_SERVICE_VERSION: ${OTEL_SERVICE_VERSION:-unknown}
     restart: unless-stopped
     logging: *default-logging
     networks:

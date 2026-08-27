@@ -16,6 +16,7 @@ Este documento describe exclusivamente la implementación actual.
 | Persistencia  | Drizzle + PostgreSQL 17               | Schemas en módulos y cliente compartido en `src/infra/db/` |
 | Autenticación | Better Auth con adapter Drizzle       | Implementación en `src/infra/auth/`                        |
 | Logging       | Pino mediante Fastify                 | Logs estructurados de requests y errores inesperados       |
+| Tracing       | OpenTelemetry con exportación OTLP    | Instrumentación central en `src/infra/telemetry/`          |
 | Testing       | Vitest + Testcontainers               | Unitarios puros e integración contra PostgreSQL real       |
 
 ## 2. Estilo: monolito modular con vertical slices
@@ -34,6 +35,7 @@ backend/src/
   infra/
     auth/
     db/
+    telemetry/
   http/
   shared/
   config/
@@ -43,6 +45,8 @@ Responsabilidades:
 
 - `modules/`: reglas y operaciones de cada dominio.
 - `infra/`: autenticación y conexión a PostgreSQL.
+- `infra/telemetry/`: inicialización y exportación neutral de trazas
+  OpenTelemetry.
 - `http/`: construcción de Fastify y manejo global de errores.
 - `shared/`: errores y helpers reutilizados por varios dominios.
 - `config/`: lectura y validación centralizada del entorno.
@@ -97,6 +101,9 @@ dominio.
     rutas.
 13. **El cierre es ordenado.** `SIGTERM` y `SIGINT` llaman `app.close()` y el
     pool de PostgreSQL se libera mediante `onClose`.
+14. **La telemetría no conoce proveedores.** El backend exporta OTLP a un
+    collector configurado por entorno. No contiene endpoints ni credenciales
+    de Grafana y no importa SDK propietarios dentro de módulos de negocio.
 
 ## 5. Persistencia y migraciones
 
@@ -147,6 +154,12 @@ Reglas:
   esperados se devuelven sin registrarlos como fallos internos.
 - El entrypoint maneja `SIGTERM` y `SIGINT`; los recursos se liberan mediante
   hooks de Fastify.
+- Cuando tracing está habilitado, el entrypoint inicia OpenTelemetry antes de
+  cargar Fastify y drena los spans al cerrar. `/health` queda excluido y los
+  parámetros de query se redactan.
+- Pino añade `trace_id` y `span_id` a los logs emitidos dentro de un request.
+  Los logs continúan saliendo una sola vez por `stdout`; OpenTelemetry no los
+  reenvía.
 
 El monitoreo externo y los procedimientos de diagnóstico están en
 `docs/operations/monitoring-and-security.md`.

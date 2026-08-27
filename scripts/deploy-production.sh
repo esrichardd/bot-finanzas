@@ -65,6 +65,10 @@ readonly deployed_sha="$(git rev-parse HEAD)"
 [[ "${deployed_sha}" == "${target_sha}" ]] ||
   fail "production HEAD does not match the requested commit"
 
+# Docker Compose pasa este SHA al backend como service.version de OpenTelemetry.
+# Permite relacionar trazas y errores con el commit exacto desplegado.
+export OTEL_SERVICE_VERSION="${deployed_sha}"
+
 docker compose -f "${COMPOSE_FILE}" config --quiet
 docker compose -f "${COMPOSE_FILE}" up --build -d --remove-orphans
 

@@ -13,19 +13,37 @@ dotenv.config({
   quiet: true,
 });
 
-const envSchema = z.object({
-  NODE_ENV: z
-    .enum(["development", "test", "production"])
-    .default("development"),
-  PORT: z.coerce.number().int().positive().max(65535).default(3000),
-  DATABASE_URL: z.string().url().startsWith("postgres"),
-  LOG_LEVEL: z
-    .enum(["fatal", "error", "warn", "info", "debug", "trace"])
-    .default("info"),
-  BETTER_AUTH_SECRET: z.string().min(32),
-  BETTER_AUTH_URL: z.string().url().default("http://localhost:3000"),
-  BETTER_AUTH_TRUSTED_ORIGINS: z.string().default(""),
-});
+const envSchema = z
+  .object({
+    NODE_ENV: z
+      .enum(["development", "test", "production"])
+      .default("development"),
+    PORT: z.coerce.number().int().positive().max(65535).default(3000),
+    DATABASE_URL: z.string().url().startsWith("postgres"),
+    LOG_LEVEL: z
+      .enum(["fatal", "error", "warn", "info", "debug", "trace"])
+      .default("info"),
+    BETTER_AUTH_SECRET: z.string().min(32),
+    BETTER_AUTH_URL: z.string().url().default("http://localhost:3000"),
+    BETTER_AUTH_TRUSTED_ORIGINS: z.string().default(""),
+    OTEL_TRACING_ENABLED: z.enum(["true", "false"]).optional(),
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: z.string().url().optional(),
+    OTEL_SERVICE_NAME: z.string().trim().min(1).optional(),
+    OTEL_SERVICE_VERSION: z.string().trim().min(1).optional(),
+    OTEL_TRACE_SAMPLE_RATIO: z.coerce.number().min(0).max(1).optional(),
+  })
+  .superRefine((config, context) => {
+    if (
+      config.OTEL_TRACING_ENABLED === "true" &&
+      config.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"],
+        message: "es requerida cuando OTEL_TRACING_ENABLED=true",
+      });
+    }
+  });
 
 const parsed = envSchema.safeParse(process.env);
 
