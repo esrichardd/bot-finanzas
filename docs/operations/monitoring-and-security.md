@@ -124,6 +124,29 @@ free -h
 uptime
 ```
 
+### Logs locales de Docker
+
+Todos los servicios de producción usan el driver `json-file` con rotación:
+cada contenedor conserva como máximo tres archivos de 10 MB. El límite
+conjunto esperado para los cinco servicios es aproximadamente 150 MB. Docker
+elimina automáticamente el archivo más antiguo; no se deben borrar manualmente
+los archivos dentro de `/var/lib/docker`.
+
+Comprobar la configuración efectiva del backend:
+
+```bash
+docker inspect finanzas-backend-1 \
+  --format 'Driver={{.HostConfig.LogConfig.Type}} Options={{json .HostConfig.LogConfig.Config}}'
+```
+
+La salida debe indicar `json-file`, `max-size=10m` y `max-file=3`. Medir el
+espacio local ocupado por los contenedores:
+
+```bash
+sudo du -sh /var/lib/docker/containers
+```
+
+
 ### Señales que requieren investigación
 
 - Un `Accepted publickey` desde una IP o en un horario desconocido.

@@ -9,6 +9,12 @@
 # postgres-admin-proxy: internal + admin, con binding 127.0.0.1:15432 detrás de SSH.
 # Backend: internal + web.
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:17
@@ -21,6 +27,7 @@ services:
     networks:
       - internal
     restart: unless-stopped
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -42,6 +49,7 @@ services:
       - internal
       - admin
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,6 +63,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - internal # hablar con postgres
       - web # salir a internet; Caddy le llegará por aquí (sin puertos al host)
@@ -74,6 +83,7 @@ services:
       # Fetches server-side del frontend van directo al backend por la red interna del compose.
       BACKEND_URL: http://backend:3000
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - web
     depends_on:
@@ -82,6 +92,7 @@ services:
   caddy:
     image: caddy:2
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "80:80"
       - "443:443"
